@@ -31,6 +31,7 @@
 #include "FDTD/extensions/operator_ext_tfsf.h"
 #include "FDTD/extensions/operator_ext_mur_abc.h"
 #include "FDTD/extensions/operator_ext_upml.h"
+#include "FDTD/extensions/operator_ext_cpml.h"
 #include "FDTD/extensions/operator_ext_lorentzmaterial.h"
 #include "FDTD/extensions/operator_ext_debyematerial.h"
 #include "FDTD/extensions/operator_ext_lumpedRLC.h"
@@ -145,6 +146,14 @@ void openEMS::Reset()
 		m_PML_size[n] = 8;
 		m_Mur_v_ph[n] = 0;
 	}
+
+	// Initialize CPML configuration with defaults
+	m_use_CPML = false;
+	m_CPML_kappa_max = 15.0;
+	m_CPML_alpha_max = 0.05;
+	m_CPML_sigma_max = -1.0;  // Auto-calculate
+	m_CPML_grading_order = 4.0;
+	m_CPML_reflection_coeff = 1e-16;
 }
 
 void openEMS::collectCommandLineArguments()
@@ -444,8 +453,18 @@ bool openEMS::SetupBoundaryConditions()
 	}
 
 
-	//create the upml
-	Operator_Ext_UPML::Create_UPML(FDTD_Op, m_BC_type, m_PML_size, string());
+	//create the upml or cpml
+	if (m_use_CPML)
+	{
+		Operator_Ext_CPML::Create_CPML(FDTD_Op, m_BC_type, m_PML_size,
+		                               m_CPML_kappa_max, m_CPML_alpha_max,
+		                               m_CPML_sigma_max, m_CPML_grading_order,
+		                               m_CPML_reflection_coeff);
+	}
+	else
+	{
+		Operator_Ext_UPML::Create_UPML(FDTD_Op, m_BC_type, m_PML_size, string());
+	}
 
 	return true;
 }
