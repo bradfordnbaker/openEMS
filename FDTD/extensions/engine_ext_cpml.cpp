@@ -123,7 +123,7 @@ void Engine_Ext_CPML::DoPostVoltageUpdatesImpl(EngType* eng, int threadID)
 				eng->EngType::SetVolt(0,pos, Ex_new);
 
 				// Update psi fields and apply CPML correction for Ey component
-				if (pos[0] < m_Op_CPML->m_Op->GetNumberOfLines(0,true)-1)
+				if (pos[2] < m_Op_CPML->m_Op->GetNumberOfLines(2,true)-1)
 				{
 					// dHx/dz for Ey (note: this is stored in psi_volt_y since z-derivative)
 					FDTD_FLOAT dHx_dz = (eng->EngType::GetCurr(0,pos) -
@@ -136,7 +136,7 @@ void Engine_Ext_CPML::DoPostVoltageUpdatesImpl(EngType* eng, int threadID)
 						m_Op_CPML->a_E(1, loc_pos[0], loc_pos[1], loc_pos[2]) * dHx_dz;
 				}
 
-				if (pos[2] < m_Op_CPML->m_Op->GetNumberOfLines(2,true)-1)
+				if (pos[0] < m_Op_CPML->m_Op->GetNumberOfLines(0,true)-1)
 				{
 					// dHz/dx for Ey
 					FDTD_FLOAT dHz_dx = (eng->EngType::GetCurr(2,pos) -
@@ -269,7 +269,7 @@ void Engine_Ext_CPML::DoPostCurrentUpdatesImpl(EngType* eng, int threadID)
 				eng->EngType::SetCurr(0,pos, Hx_new);
 
 				// Update psi fields and apply CPML correction for Hy component
-				if ((pos[0] > 0) && (pos[0] < m_Op_CPML->m_Op->GetNumberOfLines(0,true)-1))
+				if ((pos[2] > 0) && (pos[2] < m_Op_CPML->m_Op->GetNumberOfLines(2,true)-1))
 				{
 					// dEx/dz for Hy
 					FDTD_FLOAT dEx_dz = (eng->EngType::GetVolt(0,pos[0],pos[1],pos[2]-1) -
@@ -282,7 +282,7 @@ void Engine_Ext_CPML::DoPostCurrentUpdatesImpl(EngType* eng, int threadID)
 						m_Op_CPML->a_H(1, loc_pos[0], loc_pos[1], loc_pos[2]) * dEx_dz;
 				}
 
-				if ((pos[2] > 0) && (pos[2] < m_Op_CPML->m_Op->GetNumberOfLines(2,true)-1))
+				if ((pos[0] > 0) && (pos[0] < m_Op_CPML->m_Op->GetNumberOfLines(0,true)-1))
 				{
 					// dEz/dx for Hy
 					FDTD_FLOAT dEz_dx = (eng->EngType::GetVolt(2,pos[0]-1,pos[1],pos[2]) -
