@@ -25,6 +25,13 @@ there are unreleased changes. It becomes the next release entry.
 - `python -m openEMS.compare <sim_path_a> <sim_path_b>` compares the probes
   and field dumps of two runs, e.g. of two engines, and
   `openEMS.compare.compare_sim_results()` does the same from Python.
+- **A convolutional PML (CPML)** as an alternative to the UPML for `PML_n`
+  boundaries, enabled from Python with `SetCPML()`. `SetCPMLKappaMax()`,
+  `SetCPMLAlphaMax()`, `SetCPMLSigmaMax()`, `SetCPMLGradingOrder()` and
+  `SetCPMLReflectionCoeff()` set its grading; sigma is chosen automatically
+  by default. Python only so far: the setting is not written to the XML, so
+  Octave and the openEMS binary still use the UPML. The GPU engine runs it on
+  the host.
 
 ### Fixed
 
