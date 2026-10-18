@@ -236,7 +236,8 @@ void Engine_Ext_CPML::DoPostVoltageUpdatesImpl(EngType* eng, int threadID)
 				{
 					const int c = m_comp[t];
 					FDTD_FLOAT diff = eng->EngType::GetCurr(m_diff[t],pos) - eng->EngType::GetCurr(m_diff[t],prev);
-					cell.psi[t] = cell.b * cell.psi[t] + cell.ca[t] * diff;
+					cell.psi[t] = cell.b * cell.psi[t] + cell.ca[t] * (diff + cell.prev[t]);
+					cell.prev[t] = diff;
 					eng->EngType::SetVolt(c, pos, eng->EngType::GetVolt(c,pos) + cell.psi[t] + cell.ck[t] * diff);
 				}
 			}
@@ -277,7 +278,8 @@ void Engine_Ext_CPML::DoPostVoltageUpdatesSSE(Engine_sse* eng, int threadID)
 					for (int t=0; t<2; ++t)
 					{
 						v4sf diff = curr(m_diff[t], pos[0], pos[1], zv).v - curr(m_diff[t], prev[0], prev[1], zv).v;
-						cell->psi[t].v = cell->b.v * cell->psi[t].v + cell->ca[t].v * diff;
+						cell->psi[t].v = cell->b.v * cell->psi[t].v + cell->ca[t].v * (diff + cell->prev[t].v);
+						cell->prev[t].v = diff;
 						volt(m_comp[t], pos[0], pos[1], zv).v += cell->psi[t].v + cell->ck[t].v * diff;
 					}
 				}
@@ -295,7 +297,8 @@ void Engine_Ext_CPML::DoPostVoltageUpdatesSSE(Engine_sse* eng, int threadID)
 				for (int t=0; t<2; ++t)
 				{
 					FDTD_FLOAT diff = curr(m_diff[t], pos[0], pos[1], zv).f[l] - curr(m_diff[t], pos[0], pos[1], zvp).f[lp];
-					cell->psi[t] = cell->b * cell->psi[t] + cell->ca[t] * diff;
+					cell->psi[t] = cell->b * cell->psi[t] + cell->ca[t] * (diff + cell->prev[t]);
+					cell->prev[t] = diff;
 					volt(m_comp[t], pos[0], pos[1], zv).f[l] += cell->psi[t] + cell->ck[t] * diff;
 				}
 			}
@@ -369,7 +372,8 @@ void Engine_Ext_CPML::DoPostCurrentUpdatesImpl(EngType* eng, int threadID)
 				{
 					const int c = m_comp[t];
 					FDTD_FLOAT diff = eng->EngType::GetVolt(m_diff[t],next) - eng->EngType::GetVolt(m_diff[t],pos);
-					cell.psi[t] = cell.b * cell.psi[t] + cell.ca[t] * diff;
+					cell.psi[t] = cell.b * cell.psi[t] + cell.ca[t] * (diff + cell.prev[t]);
+					cell.prev[t] = diff;
 					eng->EngType::SetCurr(c, pos, eng->EngType::GetCurr(c,pos) + cell.psi[t] + cell.ck[t] * diff);
 				}
 			}
@@ -419,7 +423,8 @@ void Engine_Ext_CPML::DoPostCurrentUpdatesSSE(Engine_sse* eng, int threadID)
 					for (int t=0; t<2; ++t)
 					{
 						v4sf diff = volt(m_diff[t], next[0], next[1], zv).v - volt(m_diff[t], pos[0], pos[1], zv).v;
-						cell->psi[t].v = cell->b.v * cell->psi[t].v + cell->ca[t].v * diff;
+						cell->psi[t].v = cell->b.v * cell->psi[t].v + cell->ca[t].v * (diff + cell->prev[t].v);
+						cell->prev[t].v = diff;
 						curr(m_comp[t], pos[0], pos[1], zv).v += cell->psi[t].v + cell->ck[t].v * diff;
 					}
 				}
@@ -438,7 +443,8 @@ void Engine_Ext_CPML::DoPostCurrentUpdatesSSE(Engine_sse* eng, int threadID)
 				for (int t=0; t<2; ++t)
 				{
 					FDTD_FLOAT diff = volt(m_diff[t], pos[0], pos[1], zvn).f[ln] - volt(m_diff[t], pos[0], pos[1], zv).f[l];
-					cell->psi[t] = cell->b * cell->psi[t] + cell->ca[t] * diff;
+					cell->psi[t] = cell->b * cell->psi[t] + cell->ca[t] * (diff + cell->prev[t]);
+					cell->prev[t] = diff;
 					curr(m_comp[t], pos[0], pos[1], zv).f[l] += cell->psi[t] + cell->ck[t] * diff;
 				}
 			}

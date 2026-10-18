@@ -59,9 +59,9 @@ public:
 			kappa_max: Maximum kappa value (default 1)
 			alpha_max: Maximum alpha value (default 0.05)
 			sigma_max: Maximum sigma value (-1 for auto-calculate)
-			m: Grading order (default 3)
+			m: Grading order (default 4)
 			reflection_coeff: Target reflection coefficient for the auto sigma_max;
-			                  if not in (0,1), sigma_max = 0.5*0.8*(m+1)/(Z0*delta)
+			                  if not in (0,1), sigma_max = 0.8*(m+1)/(Z0*delta)
 	*/
 	virtual void SetCPMLParameters(double kappa_max, double alpha_max, double sigma_max,
 	                               double m, double reflection_coeff);
@@ -77,7 +77,7 @@ public:
 	//! Create the CPML
 	static bool Create_CPML(Operator* op, const int ui_BC[6], const unsigned int ui_size[6],
 	                        double kappa_max = 1.0, double alpha_max = 0.05, double sigma_max = -1.0,
-	                        double m = 3.0, double reflection_coeff = 0);
+	                        double m = 4.0, double reflection_coeff = 0);
 
 protected:
 	Operator_Ext_CPML(Operator* op);
@@ -108,8 +108,8 @@ protected:
 	bool m_upper;
 
 	// Coefficients for E-field (voltage) and H-field (current) updates
-	// First index: 0 = b = exp(-(sigma/kappa + alpha) * dt / eps0)
-	//              1 = a = sigma/(sigma*kappa + kappa^2*alpha) * (b - 1)
+	// First index: 0 = b = (2*eps0 - beta*dt) / (2*eps0 + beta*dt), beta = sigma/kappa + alpha
+	//              1 = a = -sigma*dt / (kappa^2 * (2*eps0 + beta*dt))
 	//              2 = 1/kappa - 1
 	ArrayLib::ArrayNIJK<FDTD_FLOAT> c_E;
 	ArrayLib::ArrayNIJK<FDTD_FLOAT> c_H;

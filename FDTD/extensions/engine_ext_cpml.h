@@ -71,13 +71,15 @@ protected:
 
 	// Per cell data for the two field components tangential to the slab
 	// normal, packed for the update loop. ca and ck include the curl sign and
-	// vi (iv), so psi is stored pre-scaled: field += psi + ck*diff
+	// vi (iv), so psi is stored pre-scaled: field += psi + ck*diff, with
+	// psi = b*psi + ca*(diff + prev) and prev the previous diff
 	struct Cell
 	{
 		FDTD_FLOAT b;
 		FDTD_FLOAT ca[2];
 		FDTD_FLOAT ck[2];
 		FDTD_FLOAT psi[2];
+		FDTD_FLOAT prev[2];
 	};
 	std::vector<Cell> m_volt;
 	std::vector<Cell> m_curr;
@@ -90,6 +92,7 @@ protected:
 		f4vector ca[2];
 		f4vector ck[2];
 		f4vector psi[2];
+		f4vector prev[2];
 	};
 	bool m_vec;
 	unsigned int m_numVectors;

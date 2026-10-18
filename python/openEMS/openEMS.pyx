@@ -371,8 +371,9 @@ cdef class openEMS:
         Set the maximum conductivity (sigma) for CPML.
 
         :param val: float -- Maximum sigma value (default=-1.0 for auto-calculation)
-                            Auto is 0.5*0.8*(m+1)/(Z0*delta) with delta the mean PML cell
-                            size, or from the reflection coefficient if one is set
+                            Auto is 0.8*(m+1)/(Z0*delta) with delta the mean PML cell
+                            size (same as R = exp(-1.6*cells)), or from the
+                            reflection coefficient if one is set
         """
         self.thisptr.SetCPMLSigmaMax(val)
 
@@ -381,7 +382,7 @@ cdef class openEMS:
 
         Set the polynomial grading order for CPML parameters.
 
-        :param val: float -- Grading order (default=3.0)
+        :param val: float -- Grading order (default=4.0)
         """
         self.thisptr.SetCPMLGradingOrder(val)
 

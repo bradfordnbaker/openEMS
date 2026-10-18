@@ -152,7 +152,7 @@ void openEMS::Reset()
 	m_CPML_kappa_max = 1.0;
 	m_CPML_alpha_max = 0.05;
 	m_CPML_sigma_max = -1.0;  // Auto-calculate
-	m_CPML_grading_order = 3.0;
+	m_CPML_grading_order = 4.0;
 	m_CPML_reflection_coeff = 0;  // unset, see Operator_Ext_CPML
 }
 

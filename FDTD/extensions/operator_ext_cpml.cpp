@@ -28,8 +28,8 @@ Operator_Ext_CPML::Operator_Ext_CPML(Operator* op) : Operator_Extension(op)
 	m_kappa_max = 1.0;
 	m_alpha_max = 0.05;
 	m_sigma_max = -1.0;  // Auto-calculate
-	m_grading_order = 3.0;
-	m_reflection_coeff = 0;  // unset, sigma_max = 0.5*sigma_opt
+	m_grading_order = 4.0;
+	m_reflection_coeff = 0;  // unset, sigma_max = sigma_opt
 
 	m_dir = 0;
 	m_upper = false;
@@ -140,21 +140,25 @@ void Operator_Ext_CPML::CalcCoefficients(const unsigned int pos[3], bool isH, do
 		sigma_max = -(m + 1.0) * log(m_reflection_coeff) / (2.0 * Z0 * width);
 	else if (sigma_max < 0)
 	{
-		// half the usual optimum 0.8*(m+1)/(Z0*delta), delta the mean cell size
+		// the usual optimum 0.8*(m+1)/(Z0*delta), delta the mean cell size,
+		// same as R = exp(-1.6*numCells)
 		const unsigned int numCells = m_Size[2*n + m_upper];
 		if (numCells == 0)
 			return;
-		sigma_max = 0.5 * 0.8 * (m + 1.0) / (Z0 * width / numCells);
+		sigma_max = 0.8 * (m + 1.0) / (Z0 * width / numCells);
 	}
 
 	double kappa = 1.0 + (m_kappa_max - 1.0) * pow(depth / width, m);
 	double alpha = m_alpha_max * pow((width - depth) / width, m);
 	double sigma = sigma_max * pow(depth / width, m);
 
-	b = exp(-(sigma / kappa + alpha) * m_Op->GetTimestep() / EPS0);
-	double den = sigma * kappa + kappa * kappa * alpha;
-	if (den > 0)
-		a = sigma / den * (b - 1.0);
+	// Crank-Nicolson (bilinear) form of eps0*dpsi/dt + beta*psi = -sigma/kappa^2 * dH,
+	// psi+ = b*psi- + a*(dH+ + dH-). Second order in time, unlike the recursive
+	// convolution of Roden & Gedney, which loses up to 20 dB at the Courant limit.
+	const double dT = m_Op->GetTimestep();
+	const double beta = sigma / kappa + alpha;
+	b = (2.0*EPS0 - beta*dT) / (2.0*EPS0 + beta*dT);
+	a = -sigma * dT / (kappa * kappa * (2.0*EPS0 + beta*dT));
 	k = 1.0 / kappa - 1.0;
 }
 
