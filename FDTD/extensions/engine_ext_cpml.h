@@ -22,6 +22,7 @@
 #include "engine_extension.h"
 #include "FDTD/engine.h"
 #include "FDTD/operator.h"
+#include "FDTD/engine_sse.h"
 #include "engine_extension_dispatcher.h"
 
 class Operator_Ext_CPML;
@@ -33,6 +34,8 @@ public:
 	virtual ~Engine_Ext_CPML();
 
 	virtual void SetNumberOfThreads(int nrThread);
+
+	virtual void SetEngine(Engine* eng);
 
 	virtual void DoPreVoltageUpdates() {Engine_Ext_CPML::DoPreVoltageUpdates(0);};
 	virtual void DoPreVoltageUpdates(int threadID);
@@ -57,6 +60,10 @@ protected:
 	template <typename EngType>
 	void DoPostCurrentUpdatesImpl(EngType* eng, int threadID);
 
+	// direct access to the SSE engine arrays, avoids a div/mod per field access
+	void DoPostVoltageUpdatesSSE(Engine_sse* eng, int threadID);
+	void DoPostCurrentUpdatesSSE(Engine_sse* eng, int threadID);
+
 	Operator_Ext_CPML* m_Op_CPML;
 
 	std::vector<unsigned int> m_start;
@@ -75,11 +82,31 @@ protected:
 	std::vector<Cell> m_volt;
 	std::vector<Cell> m_curr;
 
+	// SSE engine and x/y slab: the slab spans all z lines, so it is updated
+	// four z lines at a time in the engine's own vector layout
+	struct Cell4
+	{
+		f4vector b;
+		f4vector ca[2];
+		f4vector ck[2];
+		f4vector psi[2];
+	};
+	bool m_vec;
+	unsigned int m_numVectors;
+	std::vector<Cell4> m_volt4;
+	std::vector<Cell4> m_curr4;
+
+	// SSE engine and z slab: vector index and lane of each z line
+	std::vector<unsigned int> m_zv;
+	std::vector<unsigned int> m_lane;
+
 	// tangential components and the field component differenced along the normal
 	int m_comp[2];
 	int m_diff[2];
 
 	void InitCells();
+	void CalcCell(const unsigned int loc_pos[3], const unsigned int pos[3], bool isH,
+	              FDTD_FLOAT& b, FDTD_FLOAT ca[2], FDTD_FLOAT ck[2]) const;
 	inline size_t CellIndex(const unsigned int loc_pos[3]) const;
 };
 
