@@ -149,7 +149,8 @@ void Operator_Ext_CPML::CalcCoefficients(const unsigned int pos[3], bool isH, do
 	}
 
 	double kappa = 1.0 + (m_kappa_max - 1.0) * pow(depth / width, m);
-	double alpha = m_alpha_max * pow((width - depth) / width, m);
+	// alpha graded linearly (Gedney), it acts only where sigma > 0
+	double alpha = m_alpha_max * (width - depth) / width;
 	double sigma = sigma_max * pow(depth / width, m);
 
 	// Crank-Nicolson (bilinear) form of eps0*dpsi/dt + beta*psi = -sigma/kappa^2 * dH,
