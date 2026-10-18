@@ -33,6 +33,7 @@ Operator_Ext_CPML::Operator_Ext_CPML(Operator* op) : Operator_Extension(op)
 
 	m_dir = 0;
 	m_upper = false;
+	m_numE_off = 0;
 
 	for (int n=0; n<6; ++n)
 	{
@@ -100,6 +101,7 @@ void Operator_Ext_CPML::ShowStat(ostream &ostr) const
 	ostr << "  grading order: " << m_grading_order << endl;
 	ostr << "  reflection coeff: " << m_reflection_coeff << endl;
 	ostr << "  Size (x,y,z): [" << m_numLines[0] << "," << m_numLines[1] << "," << m_numLines[2] << "]" << endl;
+	ostr << "  E components in conductors (no CPML): " << m_numE_off << endl;
 }
 
 void Operator_Ext_CPML::CalcCoefficients(const unsigned int pos[3], bool isH, double& b, double& a, double& k) const
@@ -170,6 +172,8 @@ bool Operator_Ext_CPML::BuildExtension()
 
 	c_E.Init("c_E", m_numLines);
 	c_H.Init("c_H", m_numLines);
+	m_E_off.Init("E_off", m_numLines);
+	m_numE_off = 0;
 
 	unsigned int pos[3];
 	unsigned int loc_pos[3];
@@ -179,9 +183,17 @@ bool Operator_Ext_CPML::BuildExtension()
 		for (loc_pos[1]=0; loc_pos[1]<m_numLines[1]; ++loc_pos[1])
 		{
 			pos[1] = loc_pos[1] + m_StartPos[1];
+			vector<CSPrimitives*> vPrims = m_Op->GetPrimitivesBoundBox(pos[0], pos[1], -1, CSProperties::MATERIAL);
 			for (loc_pos[2]=0; loc_pos[2]<m_numLines[2]; ++loc_pos[2])
 			{
 				pos[2] = loc_pos[2] + m_StartPos[2];
+				for (int n=0; n<3; ++n)
+				{
+					double eff_Mat[4];
+					m_Op->Calc_EffMatPos(n, pos, eff_Mat, vPrims);
+					m_E_off(n, loc_pos[0], loc_pos[1], loc_pos[2]) = (eff_Mat[1] >= 1e3);
+					m_numE_off += (eff_Mat[1] >= 1e3);
+				}
 				for (int isH=0; isH<2; ++isH)
 				{
 					double b, a, k;

@@ -64,6 +64,8 @@ void Engine_Ext_CPML::CalcCell(const unsigned int loc_pos[3], const unsigned int
 			s = sign_volt[t] * op->GetVI(m_comp[t], pos[0], pos[1], pos[2]);
 		ca[t] = s * c(1, loc_pos[0], loc_pos[1], loc_pos[2]);
 		ck[t] = s * c(2, loc_pos[0], loc_pos[1], loc_pos[2]);
+		if (!isH && m_Op_CPML->m_E_off(m_comp[t], loc_pos[0], loc_pos[1], loc_pos[2]))
+			ca[t] = ck[t] = 0;
 	}
 }
 

@@ -113,6 +113,11 @@ protected:
 	//              2 = 1/kappa - 1
 	ArrayLib::ArrayNIJK<FDTD_FLOAT> c_E;
 	ArrayLib::ArrayNIJK<FDTD_FLOAT> c_H;
+
+	// 1 where an E component sees a conductivity >= 1000 S/m: no CPML
+	// correction there, as in the UPML, to continue a signal layer
+	ArrayLib::ArrayNIJK<unsigned char> m_E_off;
+	unsigned int m_numE_off;
 };
 
 #endif // OPERATOR_EXT_CPML_H
