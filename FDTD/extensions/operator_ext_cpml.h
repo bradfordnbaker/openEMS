@@ -19,6 +19,8 @@
 #define OPERATOR_EXT_CPML_H
 
 #include "FDTD/operator.h"
+#include <ostream>
+#include <string>
 #include "operator_extension.h"
 
 #include "tools/arraylib/array_nijk.h"
@@ -47,6 +49,9 @@ public:
 
 	void SetRange(const unsigned int start[3], const unsigned int stop[3]);
 
+	//! Set the slab normal (0,1,2 = x,y,z) and whether it is the upper boundary
+	void SetDirection(int dir, bool upper) {m_dir=dir; m_upper=upper;}
+
 	//! Set the CPML parameters
 	/*!
 		Define the CPML absorption parameters.
@@ -64,9 +69,9 @@ public:
 
 	virtual Engine_Extension* CreateEngineExtention();
 
-	virtual string GetExtensionName() const {return string("Convolutional PML Extension");}
+	virtual std::string GetExtensionName() const {return std::string("Convolutional PML Extension");}
 
-	virtual void ShowStat(ostream &ostr) const;
+	virtual void ShowStat(std::ostream &ostr) const;
 
 	//! Create the CPML
 	static bool Create_CPML(Operator* op, const int ui_BC[6], const unsigned int ui_size[6],
@@ -88,20 +93,25 @@ protected:
 	double m_grading_order;
 	double m_reflection_coeff;
 
-	void CalcCPMLCoefficients(int ny, unsigned int pos[3], double Zm,
-	                          double& b_E, double& a_E, double& b_H, double& a_H);
+	//! Calculate b, a and kappa-1 correction (1/kappa-1) at a field position
+	/*!
+		The coefficients only depend on the position along the slab normal.
+		E-fields are evaluated on the line, H-fields half a cell towards +dir.
+	*/
+	void CalcCoefficients(const unsigned int pos[3], bool isH, double& b, double& a, double& k) const;
 
 	void DeleteOp();
 
-	// CPML coefficients for E-field (voltage) updates
-	// b_E: exp(-(sigma/kappa + alpha) * dt / eps0)
-	// a_E: sigma/(sigma*kappa + kappa^2*alpha) * (b_E - 1)
-	ArrayLib::ArrayNIJK<FDTD_FLOAT> b_E;
-	ArrayLib::ArrayNIJK<FDTD_FLOAT> a_E;
+	// CPML slab normal direction and side
+	int m_dir;
+	bool m_upper;
 
-	// CPML coefficients for H-field (current) updates
-	ArrayLib::ArrayNIJK<FDTD_FLOAT> b_H;
-	ArrayLib::ArrayNIJK<FDTD_FLOAT> a_H;
+	// Coefficients for E-field (voltage) and H-field (current) updates
+	// First index: 0 = b = exp(-(sigma/kappa + alpha) * dt / eps0)
+	//              1 = a = sigma/(sigma*kappa + kappa^2*alpha) * (b - 1)
+	//              2 = 1/kappa - 1
+	ArrayLib::ArrayNIJK<FDTD_FLOAT> c_E;
+	ArrayLib::ArrayNIJK<FDTD_FLOAT> c_H;
 };
 
 #endif // OPERATOR_EXT_CPML_H

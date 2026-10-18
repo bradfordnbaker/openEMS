@@ -15,6 +15,7 @@
 *	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <algorithm>
 #include "operator_ext_cpml.h"
 #include "FDTD/operator_cylindermultigrid.h"
 #include "engine_ext_cpml.h"
@@ -29,6 +30,9 @@ Operator_Ext_CPML::Operator_Ext_CPML(Operator* op) : Operator_Extension(op)
 	m_sigma_max = -1.0;  // Auto-calculate
 	m_grading_order = 4.0;
 	m_reflection_coeff = 1e-16;
+
+	m_dir = 0;
+	m_upper = false;
 
 	for (int n=0; n<6; ++n)
 	{
@@ -98,158 +102,52 @@ void Operator_Ext_CPML::ShowStat(ostream &ostr) const
 	ostr << "  Size (x,y,z): [" << m_numLines[0] << "," << m_numLines[1] << "," << m_numLines[2] << "]" << endl;
 }
 
-void Operator_Ext_CPML::CalcCPMLCoefficients(int ny, unsigned int pos[3], double Zm,
-                                              double& b_E_val, double& a_E_val,
-                                              double& b_H_val, double& a_H_val)
+void Operator_Ext_CPML::CalcCoefficients(const unsigned int pos[3], bool isH, double& b, double& a, double& k) const
 {
-	// Initialize to no absorption
-	b_E_val = 1.0;
-	a_E_val = 0.0;
-	b_H_val = 1.0;
-	a_H_val = 0.0;
+	b = 1.0;
+	a = 0.0;
+	k = 0.0;
 
-	double width = 0;
-	double depth_v = 0;  // Depth for voltage (E-field)
-	double depth_i = 0;  // Depth for current (H-field)
-	int pml_dir = -1;    // Which PML region
+	const int n = m_dir;
+	const unsigned int N = m_Op->GetNumberOfLines(n,true);
+	const unsigned int s = m_upper ? N - 1 - m_Size[2*n+1] : m_Size[2*n];
 
-	// Check each direction to find which PML we're in
-	for (int n=0; n<3; ++n)
-	{
-		// Lower boundary PML
-		if ((pos[n] <= m_Size[2*n]) && (m_BC[2*n]==3))
-		{
-			width = (m_Op->GetDiscLine(n, m_Size[2*n]) - m_Op->GetDiscLine(n, 0))
-			        * m_Op->GetGridDelta();
-			depth_v = width - (m_Op->GetDiscLine(n, pos[n]) - m_Op->GetDiscLine(n, 0))
-			          * m_Op->GetGridDelta();
+	// position along the normal, H is half a cell towards +dir
+	double x = m_Op->GetDiscLine(n, pos[n]);
+	if (isH)
+		x = 0.5 * (x + m_Op->GetDiscLine(n, std::min(pos[n]+1, N-1)));
 
-			// Cylindrical correction for alpha direction
-			Operator_Cylinder* op_cyl = dynamic_cast<Operator_Cylinder*>(m_Op);
-			if ((op_cyl) && (n==1))
-			{
-				width *= op_cyl->GetDiscDelta(0, pos[0]);
-				depth_v *= op_cyl->GetDiscDelta(0, pos[0]);
-			}
+	double width = m_upper ? m_Op->GetDiscLine(n, N-1) - m_Op->GetDiscLine(n, s)
+	                       : m_Op->GetDiscLine(n, s) - m_Op->GetDiscLine(n, 0);
+	double depth = m_upper ? x - m_Op->GetDiscLine(n, s)
+	                       : m_Op->GetDiscLine(n, s) - x;
 
-			// Adjust for staggered grid E-field position
-			if (n == ny)
-				depth_v -= m_Op->GetEdgeLength(n, pos) / 2.0;
+	// to meters, alpha lines are angles
+	double scale = m_Op->GetGridDelta();
+	if ((n==1) && dynamic_cast<Operator_Cylinder*>(m_Op))
+		scale = m_Op->GetDiscLine(0, pos[0]) * m_Op->GetGridDelta();
+	width *= scale;
+	depth *= scale;
 
-			// H-field position
-			depth_i = width - (m_Op->GetDiscLine(n, pos[n]) - m_Op->GetDiscLine(n, 0))
-			          * m_Op->GetGridDelta();
-			if ((op_cyl) && (n==1))
-				depth_i *= op_cyl->GetDiscDelta(0, pos[0]);
-			if (n != ny)
-				depth_i -= m_Op->GetEdgeLength(n, pos) / 2.0;
-
-			pml_dir = 2*n;
-			break;
-		}
-		// Upper boundary PML
-		else if ((pos[n] >= m_Op->GetNumberOfLines(n,true) - 1 - m_Size[2*n+1])
-		         && (m_BC[2*n+1]==3))
-		{
-			width = (m_Op->GetDiscLine(n, m_Op->GetNumberOfLines(n,true)-1) -
-			         m_Op->GetDiscLine(n, m_Op->GetNumberOfLines(n,true) - 1 - m_Size[2*n+1]))
-			        * m_Op->GetGridDelta();
-			depth_v = (m_Op->GetDiscLine(n, pos[n]) -
-			           m_Op->GetDiscLine(n, m_Op->GetNumberOfLines(n,true) - 1 - m_Size[2*n+1]))
-			          * m_Op->GetGridDelta();
-
-			// Cylindrical correction
-			Operator_Cylinder* op_cyl = dynamic_cast<Operator_Cylinder*>(m_Op);
-			if ((op_cyl) && (n==1))
-			{
-				width *= op_cyl->GetDiscDelta(0, pos[0]);
-				depth_v *= op_cyl->GetDiscDelta(0, pos[0]);
-			}
-
-			// Adjust for staggered grid E-field position
-			if (n == ny)
-				depth_v -= m_Op->GetEdgeLength(n, pos) / 2.0;
-
-			// H-field position
-			depth_i = (m_Op->GetDiscLine(n, pos[n]) -
-			           m_Op->GetDiscLine(n, m_Op->GetNumberOfLines(n,true) - 1 - m_Size[2*n+1]))
-			          * m_Op->GetGridDelta();
-			if ((op_cyl) && (n==1))
-				depth_i *= op_cyl->GetDiscDelta(0, pos[0]);
-			if (n != ny)
-				depth_i -= m_Op->GetEdgeLength(n, pos) / 2.0;
-
-			pml_dir = 2*n+1;
-			break;
-		}
-	}
-
-	// Not in PML region
-	if (pml_dir < 0)
+	if (width <= 0)
 		return;
+	if (depth < 0) depth = 0;
+	if (depth > width) depth = width;
 
-	// Make sure depth is non-negative
-	if (depth_v < 0) depth_v = 0;
-	if (depth_i < 0) depth_i = 0;
-	if (width <= 0) return;
+	const double m = m_grading_order;
+	double sigma_max = m_sigma_max;
+	if (sigma_max < 0)
+		sigma_max = -(m + 1.0) * log(m_reflection_coeff) / (2.0 * Z0 * width);
 
-	double dT = m_Op->GetTimestep();
+	double kappa = 1.0 + (m_kappa_max - 1.0) * pow(depth / width, m);
+	double alpha = m_alpha_max * pow((width - depth) / width, m);
+	double sigma = sigma_max * pow(depth / width, m);
 
-	// Calculate graded parameters for E-field position
-	double kappa_v = 1.0 + (m_kappa_max - 1.0) * pow(depth_v / width, m_grading_order);
-	double alpha_v = m_alpha_max * pow((width - depth_v) / width, m_grading_order);
-	double sigma_v = m_sigma_max * pow(depth_v / width, m_grading_order);
-
-	// Calculate b_E and a_E coefficients
-	double damping_v = (sigma_v / kappa_v + alpha_v);
-
-	if (fabs(damping_v) < 1e-10)
-	{
-		// Taylor expansion for numerical stability
-		b_E_val = 1.0 - damping_v * dT / __EPS0__;
-		a_E_val = -dT / __EPS0__;
-	}
-	else
-	{
-		b_E_val = exp(-damping_v * dT / __EPS0__);
-		if (fabs(alpha_v) < 1e-10)
-		{
-			// Simplified formula when alpha = 0
-			a_E_val = (1.0 - b_E_val) / kappa_v;
-		}
-		else
-		{
-			a_E_val = sigma_v / (sigma_v * kappa_v + kappa_v * kappa_v * alpha_v) * (b_E_val - 1.0);
-		}
-	}
-
-	// Calculate graded parameters for H-field position
-	double kappa_i = 1.0 + (m_kappa_max - 1.0) * pow(depth_i / width, m_grading_order);
-	double alpha_i = m_alpha_max * pow((width - depth_i) / width, m_grading_order);
-	double sigma_i = m_sigma_max * pow(depth_i / width, m_grading_order);
-
-	// Calculate b_H and a_H coefficients
-	double damping_i = (sigma_i / kappa_i + alpha_i);
-
-	if (fabs(damping_i) < 1e-10)
-	{
-		// Taylor expansion for numerical stability
-		b_H_val = 1.0 - damping_i * dT / __EPS0__;
-		a_H_val = -dT / __EPS0__;
-	}
-	else
-	{
-		b_H_val = exp(-damping_i * dT / __EPS0__);
-		if (fabs(alpha_i) < 1e-10)
-		{
-			// Simplified formula when alpha = 0
-			a_H_val = (1.0 - b_H_val) / kappa_i;
-		}
-		else
-		{
-			a_H_val = sigma_i / (sigma_i * kappa_i + kappa_i * kappa_i * alpha_i) * (b_H_val - 1.0);
-		}
-	}
+	b = exp(-(sigma / kappa + alpha) * m_Op->GetTimestep() / EPS0);
+	double den = sigma * kappa + kappa * kappa * alpha;
+	if (den > 0)
+		a = sigma / den * (b - 1.0);
+	k = 1.0 / kappa - 1.0;
 }
 
 bool Operator_Ext_CPML::BuildExtension()
@@ -257,47 +155,11 @@ bool Operator_Ext_CPML::BuildExtension()
 	if (m_Op == NULL)
 		return false;
 
-	// Auto-calculate sigma_max if not specified
-	if (m_sigma_max < 0)
-	{
-		// Calculate average PML width
-		double L_avg = 0;
-		int count = 0;
-		for (int n=0; n<3; ++n)
-		{
-			if (m_BC[2*n] == 3)
-			{
-				L_avg += (m_Op->GetDiscLine(n, m_Size[2*n]) - m_Op->GetDiscLine(n, 0))
-				         * m_Op->GetGridDelta();
-				count++;
-			}
-			if (m_BC[2*n+1] == 3)
-			{
-				L_avg += (m_Op->GetDiscLine(n, m_Op->GetNumberOfLines(n,true)-1) -
-				          m_Op->GetDiscLine(n, m_Op->GetNumberOfLines(n,true) - 1 - m_Size[2*n+1]))
-				         * m_Op->GetGridDelta();
-				count++;
-			}
-		}
-		if (count > 0)
-			L_avg /= count;
-		else
-			L_avg = 1.0;  // Fallback
+	c_E.Init("c_E", m_numLines);
+	c_H.Init("c_H", m_numLines);
 
-		// Standard CPML formula: sigma_max = -(m+1) * ln(R) / (2 * Z0 * L)
-		m_sigma_max = -(m_grading_order + 1.0) * log(m_reflection_coeff) / (2.0 * __Z0__ * L_avg);
-	}
-
-	// Initialize coefficient arrays
-	b_E.Init("b_E", m_numLines);
-	a_E.Init("a_E", m_numLines);
-	b_H.Init("b_H", m_numLines);
-	a_H.Init("a_H", m_numLines);
-
-	// Loop through all cells in PML region
 	unsigned int pos[3];
 	unsigned int loc_pos[3];
-
 	for (loc_pos[0]=0; loc_pos[0]<m_numLines[0]; ++loc_pos[0])
 	{
 		pos[0] = loc_pos[0] + m_StartPos[0];
@@ -307,17 +169,14 @@ bool Operator_Ext_CPML::BuildExtension()
 			for (loc_pos[2]=0; loc_pos[2]<m_numLines[2]; ++loc_pos[2])
 			{
 				pos[2] = loc_pos[2] + m_StartPos[2];
-
-				// Calculate coefficients for each field direction
-				for (int n=0; n<3; ++n)
+				for (int isH=0; isH<2; ++isH)
 				{
-					double b_E_val, a_E_val, b_H_val, a_H_val;
-					CalcCPMLCoefficients(n, pos, __Z0__, b_E_val, a_E_val, b_H_val, a_H_val);
-
-					b_E(n, loc_pos[0], loc_pos[1], loc_pos[2]) = b_E_val;
-					a_E(n, loc_pos[0], loc_pos[1], loc_pos[2]) = a_E_val;
-					b_H(n, loc_pos[0], loc_pos[1], loc_pos[2]) = b_H_val;
-					a_H(n, loc_pos[0], loc_pos[1], loc_pos[2]) = a_H_val;
+					double b, a, k;
+					CalcCoefficients(pos, isH, b, a, k);
+					ArrayLib::ArrayNIJK<FDTD_FLOAT>& c = isH ? c_H : c_E;
+					c(0, loc_pos[0], loc_pos[1], loc_pos[2]) = b;
+					c(1, loc_pos[0], loc_pos[1], loc_pos[2]) = a;
+					c(2, loc_pos[0], loc_pos[1], loc_pos[2]) = k;
 				}
 			}
 		}
@@ -380,94 +239,29 @@ bool Operator_Ext_CPML::Create_CPML(Operator* op, const int ui_BC[6], const unsi
 		}
 	}
 
-	// Create CPML extensions for each boundary
-	Operator_Ext_CPML* op_ext_cpml = NULL;
-	unsigned int start[3];
-	unsigned int stop[3];
-
-	// X-direction PML (r-direction in cylindrical)
-	if (BC[0]==3)
+	// One slab per boundary. A slab only corrects the derivatives along its
+	// normal, so slabs span the full mesh in the other directions and overlap
+	// in the corners, where the corrections of each direction add up.
+	for (int n=0; n<6; ++n)
 	{
-		op_ext_cpml = new Operator_Ext_CPML(op);
+		if (BC[n]!=3)
+			continue;
+
+		const int dir = n/2;
+		const bool upper = n%2;
+		unsigned int start[3] = {0, 0, 0};
+		unsigned int stop[3];
+		for (int d=0; d<3; ++d)
+			stop[d] = op->GetNumberOfLines(d,true)-1;
+		if (upper)
+			start[dir] = stop[dir] - size[n];
+		else
+			stop[dir] = size[n];
+
+		Operator_Ext_CPML* op_ext_cpml = new Operator_Ext_CPML(op);
 		op_ext_cpml->SetCPMLParameters(kappa_max, alpha_max, sigma_max, m, reflection_coeff);
-		start[0] = 0;
-		start[1] = 0;
-		start[2] = 0;
-		stop[0] = size[0];
-		stop[1] = op->GetNumberOfLines(1,true)-1;
-		stop[2] = op->GetNumberOfLines(2,true)-1;
 		op_ext_cpml->SetBoundaryCondition(BC, size);
-		op_ext_cpml->SetRange(start, stop);
-		op->AddExtension(op_ext_cpml);
-	}
-
-	if (BC[1]==3)
-	{
-		op_ext_cpml = new Operator_Ext_CPML(op);
-		op_ext_cpml->SetCPMLParameters(kappa_max, alpha_max, sigma_max, m, reflection_coeff);
-		start[0] = op->GetNumberOfLines(0,true) - 1 - size[1];
-		start[1] = 0;
-		start[2] = 0;
-		stop[0] = op->GetNumberOfLines(0,true) - 1;
-		stop[1] = op->GetNumberOfLines(1,true)-1;
-		stop[2] = op->GetNumberOfLines(2,true)-1;
-		op_ext_cpml->SetBoundaryCondition(BC, size);
-		op_ext_cpml->SetRange(start, stop);
-		op->AddExtension(op_ext_cpml);
-	}
-
-	// Y-direction PML (alpha-direction in cylindrical) - skip x-direction corners
-	start[0] = (size[0]+1) * (BC[0]==3);
-	stop[0] = op->GetNumberOfLines(0,true) - 1 - (size[1]+1) * (BC[1]==3);
-
-	if (BC[2]==3)
-	{
-		op_ext_cpml = new Operator_Ext_CPML(op);
-		op_ext_cpml->SetCPMLParameters(kappa_max, alpha_max, sigma_max, m, reflection_coeff);
-		start[1] = 0;
-		start[2] = 0;
-		stop[1] = size[2];
-		stop[2] = op->GetNumberOfLines(2,true)-1;
-		op_ext_cpml->SetBoundaryCondition(BC, size);
-		op_ext_cpml->SetRange(start, stop);
-		op->AddExtension(op_ext_cpml);
-	}
-
-	if (BC[3]==3)
-	{
-		op_ext_cpml = new Operator_Ext_CPML(op);
-		op_ext_cpml->SetCPMLParameters(kappa_max, alpha_max, sigma_max, m, reflection_coeff);
-		start[1] = op->GetNumberOfLines(1,true) - 1 - size[3];
-		start[2] = 0;
-		stop[1] = op->GetNumberOfLines(1,true) - 1;
-		stop[2] = op->GetNumberOfLines(2,true)-1;
-		op_ext_cpml->SetBoundaryCondition(BC, size);
-		op_ext_cpml->SetRange(start, stop);
-		op->AddExtension(op_ext_cpml);
-	}
-
-	// Z-direction PML - skip x and y-direction corners
-	start[1] = (size[2]+1) * (BC[2]==3);
-	stop[1] = op->GetNumberOfLines(1,true) - 1 - (size[3]+1) * (BC[3]==3);
-
-	if (BC[4]==3)
-	{
-		op_ext_cpml = new Operator_Ext_CPML(op);
-		op_ext_cpml->SetCPMLParameters(kappa_max, alpha_max, sigma_max, m, reflection_coeff);
-		start[2] = 0;
-		stop[2] = size[4];
-		op_ext_cpml->SetBoundaryCondition(BC, size);
-		op_ext_cpml->SetRange(start, stop);
-		op->AddExtension(op_ext_cpml);
-	}
-
-	if (BC[5]==3)
-	{
-		op_ext_cpml = new Operator_Ext_CPML(op);
-		op_ext_cpml->SetCPMLParameters(kappa_max, alpha_max, sigma_max, m, reflection_coeff);
-		start[2] = op->GetNumberOfLines(2,true) - 1 - size[5];
-		stop[2] = op->GetNumberOfLines(2,true) - 1;
-		op_ext_cpml->SetBoundaryCondition(BC, size);
+		op_ext_cpml->SetDirection(dir, upper);
 		op_ext_cpml->SetRange(start, stop);
 		op->AddExtension(op_ext_cpml);
 	}

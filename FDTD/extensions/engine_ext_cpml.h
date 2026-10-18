@@ -18,6 +18,7 @@
 #ifndef ENGINE_EXT_CPML_H
 #define ENGINE_EXT_CPML_H
 
+#include <vector>
 #include "engine_extension.h"
 #include "FDTD/engine.h"
 #include "FDTD/operator.h"
@@ -58,22 +59,13 @@ protected:
 
 	Operator_Ext_CPML* m_Op_CPML;
 
-	vector<unsigned int> m_start;
-	vector<unsigned int> m_numX;
+	std::vector<unsigned int> m_start;
+	std::vector<unsigned int> m_numX;
 
-	// CPML auxiliary psi fields for E-field (voltage) updates
-	// psi_volt_x stores psi fields for derivatives in y-direction
-	// psi_volt_y stores psi fields for derivatives in z-direction
-	// First index: field component (0=Ex, 1=Ey, 2=Ez)
-	ArrayLib::ArrayNIJK<FDTD_FLOAT> psi_volt_x;
-	ArrayLib::ArrayNIJK<FDTD_FLOAT> psi_volt_y;
-
-	// CPML auxiliary psi fields for H-field (current) updates
-	// psi_curr_x stores psi fields for derivatives in y-direction
-	// psi_curr_y stores psi fields for derivatives in z-direction
-	// First index: field component (0=Hx, 1=Hy, 2=Hz)
-	ArrayLib::ArrayNIJK<FDTD_FLOAT> psi_curr_x;
-	ArrayLib::ArrayNIJK<FDTD_FLOAT> psi_curr_y;
+	// CPML auxiliary psi fields, only the two components tangential to the
+	// slab normal are used (first index: field component)
+	ArrayLib::ArrayNIJK<FDTD_FLOAT> psi_volt;
+	ArrayLib::ArrayNIJK<FDTD_FLOAT> psi_curr;
 };
 
 #endif // ENGINE_EXT_CPML_H

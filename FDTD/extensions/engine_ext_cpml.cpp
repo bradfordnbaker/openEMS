@@ -28,10 +28,8 @@ Engine_Ext_CPML::Engine_Ext_CPML(Operator_Ext_CPML* op_ext) : Engine_Extension(o
 	//this ABC extension should have high priority
 	m_Priority = ENG_EXT_PRIO_CPML;
 
-	psi_volt_x.Init("psi_volt_x", m_Op_CPML->m_numLines);
-	psi_volt_y.Init("psi_volt_y", m_Op_CPML->m_numLines);
-	psi_curr_x.Init("psi_curr_x", m_Op_CPML->m_numLines);
-	psi_curr_y.Init("psi_curr_y", m_Op_CPML->m_numLines);
+	psi_volt.Init("psi_volt", m_Op_CPML->m_numLines);
+	psi_curr.Init("psi_curr", m_Op_CPML->m_numLines);
 
 	SetNumberOfThreads(1);
 }
@@ -75,6 +73,7 @@ void Engine_Ext_CPML::DoPostVoltageUpdatesImpl(EngType* eng, int threadID)
 	if (threadID>=m_NrThreads)
 		return;
 
+	const int d = m_Op_CPML->m_dir;
 	unsigned int pos[3];
 	unsigned int loc_pos[3];
 
@@ -89,104 +88,29 @@ void Engine_Ext_CPML::DoPostVoltageUpdatesImpl(EngType* eng, int threadID)
 			{
 				pos[2] = loc_pos[2] + m_Op_CPML->m_StartPos[2];
 
-				// Update psi fields and apply CPML correction for Ex component
-				if (pos[1] < m_Op_CPML->m_Op->GetNumberOfLines(1,true)-1)
+				unsigned int prev[3] = {pos[0], pos[1], pos[2]};
+				if (pos[d]>0)
+					--prev[d];
+
+				const FDTD_FLOAT b = m_Op_CPML->c_E(0, loc_pos[0], loc_pos[1], loc_pos[2]);
+				const FDTD_FLOAT a = m_Op_CPML->c_E(1, loc_pos[0], loc_pos[1], loc_pos[2]);
+				const FDTD_FLOAT k = m_Op_CPML->c_E(2, loc_pos[0], loc_pos[1], loc_pos[2]);
+
+				// E_c has +d(H_c+2)/d(c+1) - d(H_c+1)/d(c+2), same as Engine::UpdateVoltages
+				for (int c=0; c<3; ++c)
 				{
-					// dHz/dy for Ex
-					FDTD_FLOAT dHz_dy = (eng->EngType::GetCurr(2,pos) -
-					                     eng->EngType::GetCurr(2,pos[0],pos[1]+1,pos[2]));
+					if (c==d)
+						continue;
+					const int e = 3 - c - d;
+					const FDTD_FLOAT sign = (d==(c+1)%3) ? 1 : -1;
+					FDTD_FLOAT dI = sign * (eng->EngType::GetCurr(e,pos) - eng->EngType::GetCurr(e,prev));
 
-					// Update psi_Ex_y
-					psi_volt_x(0, loc_pos[0], loc_pos[1], loc_pos[2]) =
-						m_Op_CPML->b_E(0, loc_pos[0], loc_pos[1], loc_pos[2]) *
-						psi_volt_x(0, loc_pos[0], loc_pos[1], loc_pos[2]) +
-						m_Op_CPML->a_E(0, loc_pos[0], loc_pos[1], loc_pos[2]) * dHz_dy;
+					FDTD_FLOAT& psi = psi_volt(c, loc_pos[0], loc_pos[1], loc_pos[2]);
+					psi = b * psi + a * dI;
+
+					eng->EngType::SetVolt(c, pos, eng->EngType::GetVolt(c,pos) +
+						m_Op_CPML->m_Op->GetVI(c,pos) * (psi + k * dI));
 				}
-
-				if (pos[2] < m_Op_CPML->m_Op->GetNumberOfLines(2,true)-1)
-				{
-					// dHy/dz for Ex
-					FDTD_FLOAT dHy_dz = (eng->EngType::GetCurr(1,pos) -
-					                     eng->EngType::GetCurr(1,pos[0],pos[1],pos[2]+1));
-
-					// Update psi_Ex_z
-					psi_volt_y(0, loc_pos[0], loc_pos[1], loc_pos[2]) =
-						m_Op_CPML->b_E(0, loc_pos[0], loc_pos[1], loc_pos[2]) *
-						psi_volt_y(0, loc_pos[0], loc_pos[1], loc_pos[2]) +
-						m_Op_CPML->a_E(0, loc_pos[0], loc_pos[1], loc_pos[2]) * dHy_dz;
-				}
-
-				// Apply CPML correction to Ex
-				FDTD_FLOAT Ex_new = eng->EngType::GetVolt(0,pos) +
-					psi_volt_x(0, loc_pos[0], loc_pos[1], loc_pos[2]) +
-					psi_volt_y(0, loc_pos[0], loc_pos[1], loc_pos[2]);
-				eng->EngType::SetVolt(0,pos, Ex_new);
-
-				// Update psi fields and apply CPML correction for Ey component
-				if (pos[2] < m_Op_CPML->m_Op->GetNumberOfLines(2,true)-1)
-				{
-					// dHx/dz for Ey (note: this is stored in psi_volt_y since z-derivative)
-					FDTD_FLOAT dHx_dz = (eng->EngType::GetCurr(0,pos) -
-					                     eng->EngType::GetCurr(0,pos[0],pos[1],pos[2]+1));
-
-					// Update psi_Ey_z
-					psi_volt_y(1, loc_pos[0], loc_pos[1], loc_pos[2]) =
-						m_Op_CPML->b_E(1, loc_pos[0], loc_pos[1], loc_pos[2]) *
-						psi_volt_y(1, loc_pos[0], loc_pos[1], loc_pos[2]) +
-						m_Op_CPML->a_E(1, loc_pos[0], loc_pos[1], loc_pos[2]) * dHx_dz;
-				}
-
-				if (pos[0] < m_Op_CPML->m_Op->GetNumberOfLines(0,true)-1)
-				{
-					// dHz/dx for Ey
-					FDTD_FLOAT dHz_dx = (eng->EngType::GetCurr(2,pos) -
-					                     eng->EngType::GetCurr(2,pos[0]+1,pos[1],pos[2]));
-
-					// Update psi_Ey_x
-					psi_volt_x(1, loc_pos[0], loc_pos[1], loc_pos[2]) =
-						m_Op_CPML->b_E(1, loc_pos[0], loc_pos[1], loc_pos[2]) *
-						psi_volt_x(1, loc_pos[0], loc_pos[1], loc_pos[2]) +
-						m_Op_CPML->a_E(1, loc_pos[0], loc_pos[1], loc_pos[2]) * dHz_dx;
-				}
-
-				// Apply CPML correction to Ey
-				FDTD_FLOAT Ey_new = eng->EngType::GetVolt(1,pos) +
-					psi_volt_x(1, loc_pos[0], loc_pos[1], loc_pos[2]) +
-					psi_volt_y(1, loc_pos[0], loc_pos[1], loc_pos[2]);
-				eng->EngType::SetVolt(1,pos, Ey_new);
-
-				// Update psi fields and apply CPML correction for Ez component
-				if (pos[0] < m_Op_CPML->m_Op->GetNumberOfLines(0,true)-1)
-				{
-					// dHy/dx for Ez
-					FDTD_FLOAT dHy_dx = (eng->EngType::GetCurr(1,pos) -
-					                     eng->EngType::GetCurr(1,pos[0]+1,pos[1],pos[2]));
-
-					// Update psi_Ez_x
-					psi_volt_x(2, loc_pos[0], loc_pos[1], loc_pos[2]) =
-						m_Op_CPML->b_E(2, loc_pos[0], loc_pos[1], loc_pos[2]) *
-						psi_volt_x(2, loc_pos[0], loc_pos[1], loc_pos[2]) +
-						m_Op_CPML->a_E(2, loc_pos[0], loc_pos[1], loc_pos[2]) * dHy_dx;
-				}
-
-				if (pos[1] < m_Op_CPML->m_Op->GetNumberOfLines(1,true)-1)
-				{
-					// dHx/dy for Ez
-					FDTD_FLOAT dHx_dy = (eng->EngType::GetCurr(0,pos) -
-					                     eng->EngType::GetCurr(0,pos[0],pos[1]+1,pos[2]));
-
-					// Update psi_Ez_y
-					psi_volt_y(2, loc_pos[0], loc_pos[1], loc_pos[2]) =
-						m_Op_CPML->b_E(2, loc_pos[0], loc_pos[1], loc_pos[2]) *
-						psi_volt_y(2, loc_pos[0], loc_pos[1], loc_pos[2]) +
-						m_Op_CPML->a_E(2, loc_pos[0], loc_pos[1], loc_pos[2]) * dHx_dy;
-				}
-
-				// Apply CPML correction to Ez
-				FDTD_FLOAT Ez_new = eng->EngType::GetVolt(2,pos) +
-					psi_volt_x(2, loc_pos[0], loc_pos[1], loc_pos[2]) +
-					psi_volt_y(2, loc_pos[0], loc_pos[1], loc_pos[2]);
-				eng->EngType::SetVolt(2,pos, Ez_new);
 			}
 		}
 	}
@@ -221,6 +145,11 @@ void Engine_Ext_CPML::DoPostCurrentUpdatesImpl(EngType* eng, int threadID)
 	if (threadID>=m_NrThreads)
 		return;
 
+	const int d = m_Op_CPML->m_dir;
+	unsigned int numLines[3];
+	for (int n=0; n<3; ++n)
+		numLines[n] = m_Op_CPML->m_Op->GetNumberOfLines(n,true);
+
 	unsigned int pos[3];
 	unsigned int loc_pos[3];
 
@@ -228,111 +157,42 @@ void Engine_Ext_CPML::DoPostCurrentUpdatesImpl(EngType* eng, int threadID)
 	{
 		loc_pos[0]=lineX+m_start.at(threadID);
 		pos[0] = loc_pos[0] + m_Op_CPML->m_StartPos[0];
+		if (pos[0]>=numLines[0]-1)
+			continue;
 		for (loc_pos[1]=0; loc_pos[1]<m_Op_CPML->m_numLines[1]; ++loc_pos[1])
 		{
 			pos[1] = loc_pos[1] + m_Op_CPML->m_StartPos[1];
+			if (pos[1]>=numLines[1]-1)
+				continue;
 			for (loc_pos[2]=0; loc_pos[2]<m_Op_CPML->m_numLines[2]; ++loc_pos[2])
 			{
 				pos[2] = loc_pos[2] + m_Op_CPML->m_StartPos[2];
+				// Engine::UpdateCurrents does not touch the last line
+				if (pos[2]>=numLines[2]-1)
+					continue;
 
-				// Update psi fields and apply CPML correction for Hx component
-				if ((pos[1] > 0) && (pos[1] < m_Op_CPML->m_Op->GetNumberOfLines(1,true)-1))
+				unsigned int next[3] = {pos[0], pos[1], pos[2]};
+				++next[d];
+
+				const FDTD_FLOAT b = m_Op_CPML->c_H(0, loc_pos[0], loc_pos[1], loc_pos[2]);
+				const FDTD_FLOAT a = m_Op_CPML->c_H(1, loc_pos[0], loc_pos[1], loc_pos[2]);
+				const FDTD_FLOAT k = m_Op_CPML->c_H(2, loc_pos[0], loc_pos[1], loc_pos[2]);
+
+				// H_c has -d(E_c+2)/d(c+1) + d(E_c+1)/d(c+2), same as Engine::UpdateCurrents
+				for (int c=0; c<3; ++c)
 				{
-					// dEz/dy for Hx
-					FDTD_FLOAT dEz_dy = (eng->EngType::GetVolt(2,pos[0],pos[1]-1,pos[2]) -
-					                     eng->EngType::GetVolt(2,pos));
+					if (c==d)
+						continue;
+					const int e = 3 - c - d;
+					const FDTD_FLOAT sign = (d==(c+1)%3) ? -1 : 1;
+					FDTD_FLOAT dV = sign * (eng->EngType::GetVolt(e,next) - eng->EngType::GetVolt(e,pos));
 
-					// Update psi_Hx_y
-					psi_curr_x(0, loc_pos[0], loc_pos[1], loc_pos[2]) =
-						m_Op_CPML->b_H(0, loc_pos[0], loc_pos[1], loc_pos[2]) *
-						psi_curr_x(0, loc_pos[0], loc_pos[1], loc_pos[2]) +
-						m_Op_CPML->a_H(0, loc_pos[0], loc_pos[1], loc_pos[2]) * dEz_dy;
+					FDTD_FLOAT& psi = psi_curr(c, loc_pos[0], loc_pos[1], loc_pos[2]);
+					psi = b * psi + a * dV;
+
+					eng->EngType::SetCurr(c, pos, eng->EngType::GetCurr(c,pos) +
+						m_Op_CPML->m_Op->GetIV(c,pos) * (psi + k * dV));
 				}
-
-				if ((pos[2] > 0) && (pos[2] < m_Op_CPML->m_Op->GetNumberOfLines(2,true)-1))
-				{
-					// dEy/dz for Hx
-					FDTD_FLOAT dEy_dz = (eng->EngType::GetVolt(1,pos[0],pos[1],pos[2]-1) -
-					                     eng->EngType::GetVolt(1,pos));
-
-					// Update psi_Hx_z
-					psi_curr_y(0, loc_pos[0], loc_pos[1], loc_pos[2]) =
-						m_Op_CPML->b_H(0, loc_pos[0], loc_pos[1], loc_pos[2]) *
-						psi_curr_y(0, loc_pos[0], loc_pos[1], loc_pos[2]) +
-						m_Op_CPML->a_H(0, loc_pos[0], loc_pos[1], loc_pos[2]) * dEy_dz;
-				}
-
-				// Apply CPML correction to Hx
-				FDTD_FLOAT Hx_new = eng->EngType::GetCurr(0,pos) +
-					psi_curr_x(0, loc_pos[0], loc_pos[1], loc_pos[2]) +
-					psi_curr_y(0, loc_pos[0], loc_pos[1], loc_pos[2]);
-				eng->EngType::SetCurr(0,pos, Hx_new);
-
-				// Update psi fields and apply CPML correction for Hy component
-				if ((pos[2] > 0) && (pos[2] < m_Op_CPML->m_Op->GetNumberOfLines(2,true)-1))
-				{
-					// dEx/dz for Hy
-					FDTD_FLOAT dEx_dz = (eng->EngType::GetVolt(0,pos[0],pos[1],pos[2]-1) -
-					                     eng->EngType::GetVolt(0,pos));
-
-					// Update psi_Hy_z
-					psi_curr_y(1, loc_pos[0], loc_pos[1], loc_pos[2]) =
-						m_Op_CPML->b_H(1, loc_pos[0], loc_pos[1], loc_pos[2]) *
-						psi_curr_y(1, loc_pos[0], loc_pos[1], loc_pos[2]) +
-						m_Op_CPML->a_H(1, loc_pos[0], loc_pos[1], loc_pos[2]) * dEx_dz;
-				}
-
-				if ((pos[0] > 0) && (pos[0] < m_Op_CPML->m_Op->GetNumberOfLines(0,true)-1))
-				{
-					// dEz/dx for Hy
-					FDTD_FLOAT dEz_dx = (eng->EngType::GetVolt(2,pos[0]-1,pos[1],pos[2]) -
-					                     eng->EngType::GetVolt(2,pos));
-
-					// Update psi_Hy_x
-					psi_curr_x(1, loc_pos[0], loc_pos[1], loc_pos[2]) =
-						m_Op_CPML->b_H(1, loc_pos[0], loc_pos[1], loc_pos[2]) *
-						psi_curr_x(1, loc_pos[0], loc_pos[1], loc_pos[2]) +
-						m_Op_CPML->a_H(1, loc_pos[0], loc_pos[1], loc_pos[2]) * dEz_dx;
-				}
-
-				// Apply CPML correction to Hy
-				FDTD_FLOAT Hy_new = eng->EngType::GetCurr(1,pos) +
-					psi_curr_x(1, loc_pos[0], loc_pos[1], loc_pos[2]) +
-					psi_curr_y(1, loc_pos[0], loc_pos[1], loc_pos[2]);
-				eng->EngType::SetCurr(1,pos, Hy_new);
-
-				// Update psi fields and apply CPML correction for Hz component
-				if ((pos[0] > 0) && (pos[0] < m_Op_CPML->m_Op->GetNumberOfLines(0,true)-1))
-				{
-					// dEy/dx for Hz
-					FDTD_FLOAT dEy_dx = (eng->EngType::GetVolt(1,pos[0]-1,pos[1],pos[2]) -
-					                     eng->EngType::GetVolt(1,pos));
-
-					// Update psi_Hz_x
-					psi_curr_x(2, loc_pos[0], loc_pos[1], loc_pos[2]) =
-						m_Op_CPML->b_H(2, loc_pos[0], loc_pos[1], loc_pos[2]) *
-						psi_curr_x(2, loc_pos[0], loc_pos[1], loc_pos[2]) +
-						m_Op_CPML->a_H(2, loc_pos[0], loc_pos[1], loc_pos[2]) * dEy_dx;
-				}
-
-				if ((pos[1] > 0) && (pos[1] < m_Op_CPML->m_Op->GetNumberOfLines(1,true)-1))
-				{
-					// dEx/dy for Hz
-					FDTD_FLOAT dEx_dy = (eng->EngType::GetVolt(0,pos[0],pos[1]-1,pos[2]) -
-					                     eng->EngType::GetVolt(0,pos));
-
-					// Update psi_Hz_y
-					psi_curr_y(2, loc_pos[0], loc_pos[1], loc_pos[2]) =
-						m_Op_CPML->b_H(2, loc_pos[0], loc_pos[1], loc_pos[2]) *
-						psi_curr_y(2, loc_pos[0], loc_pos[1], loc_pos[2]) +
-						m_Op_CPML->a_H(2, loc_pos[0], loc_pos[1], loc_pos[2]) * dEx_dy;
-				}
-
-				// Apply CPML correction to Hz
-				FDTD_FLOAT Hz_new = eng->EngType::GetCurr(2,pos) +
-					psi_curr_x(2, loc_pos[0], loc_pos[1], loc_pos[2]) +
-					psi_curr_y(2, loc_pos[0], loc_pos[1], loc_pos[2]);
-				eng->EngType::SetCurr(2,pos, Hz_new);
 			}
 		}
 	}
