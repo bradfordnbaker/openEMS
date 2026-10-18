@@ -62,10 +62,25 @@ protected:
 	std::vector<unsigned int> m_start;
 	std::vector<unsigned int> m_numX;
 
-	// CPML auxiliary psi fields, only the two components tangential to the
-	// slab normal are used (first index: field component)
-	ArrayLib::ArrayNIJK<FDTD_FLOAT> psi_volt;
-	ArrayLib::ArrayNIJK<FDTD_FLOAT> psi_curr;
+	// Per cell data for the two field components tangential to the slab
+	// normal, packed for the update loop. ca and ck include the curl sign and
+	// vi (iv), so psi is stored pre-scaled: field += psi + ck*diff
+	struct Cell
+	{
+		FDTD_FLOAT b;
+		FDTD_FLOAT ca[2];
+		FDTD_FLOAT ck[2];
+		FDTD_FLOAT psi[2];
+	};
+	std::vector<Cell> m_volt;
+	std::vector<Cell> m_curr;
+
+	// tangential components and the field component differenced along the normal
+	int m_comp[2];
+	int m_diff[2];
+
+	void InitCells();
+	inline size_t CellIndex(const unsigned int loc_pos[3]) const;
 };
 
 #endif // ENGINE_EXT_CPML_H

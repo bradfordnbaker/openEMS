@@ -28,10 +28,63 @@ Engine_Ext_CPML::Engine_Ext_CPML(Operator_Ext_CPML* op_ext) : Engine_Extension(o
 	//this ABC extension should have high priority
 	m_Priority = ENG_EXT_PRIO_CPML;
 
-	psi_volt.Init("psi_volt", m_Op_CPML->m_numLines);
-	psi_curr.Init("psi_curr", m_Op_CPML->m_numLines);
+	InitCells();
 
 	SetNumberOfThreads(1);
+}
+
+inline size_t Engine_Ext_CPML::CellIndex(const unsigned int loc_pos[3]) const
+{
+	const unsigned int* n = m_Op_CPML->m_numLines;
+	return ((size_t)loc_pos[0]*n[1] + loc_pos[1])*n[2] + loc_pos[2];
+}
+
+void Engine_Ext_CPML::InitCells()
+{
+	// Done here and not in the operator extension: other extensions (lumped
+	// elements, sheets, hard sources) may still change vi/iv during their build.
+	const int d = m_Op_CPML->m_dir;
+	m_comp[0] = (d+1)%3;
+	m_diff[0] = (d+2)%3;
+	m_comp[1] = (d+2)%3;
+	m_diff[1] = (d+1)%3;
+	// sign of the normal derivative term in Engine::UpdateVoltages, UpdateCurrents has the opposite
+	const FDTD_FLOAT sign_volt[2] = {-1, 1};
+
+	const unsigned int* n = m_Op_CPML->m_numLines;
+	m_volt.assign((size_t)n[0]*n[1]*n[2], Cell());
+	m_curr.assign((size_t)n[0]*n[1]*n[2], Cell());
+
+	Operator* op = m_Op_CPML->m_Op;
+	unsigned int pos[3];
+	unsigned int loc_pos[3];
+	for (loc_pos[0]=0; loc_pos[0]<n[0]; ++loc_pos[0])
+	{
+		pos[0] = loc_pos[0] + m_Op_CPML->m_StartPos[0];
+		for (loc_pos[1]=0; loc_pos[1]<n[1]; ++loc_pos[1])
+		{
+			pos[1] = loc_pos[1] + m_Op_CPML->m_StartPos[1];
+			for (loc_pos[2]=0; loc_pos[2]<n[2]; ++loc_pos[2])
+			{
+				pos[2] = loc_pos[2] + m_Op_CPML->m_StartPos[2];
+				Cell& v = m_volt[CellIndex(loc_pos)];
+				Cell& i = m_curr[CellIndex(loc_pos)];
+				v.b = m_Op_CPML->c_E(0, loc_pos[0], loc_pos[1], loc_pos[2]);
+				i.b = m_Op_CPML->c_H(0, loc_pos[0], loc_pos[1], loc_pos[2]);
+				for (int t=0; t<2; ++t)
+				{
+					FDTD_FLOAT vi = sign_volt[t] * op->GetVI(m_comp[t], pos);
+					FDTD_FLOAT iv = -sign_volt[t] * op->GetIV(m_comp[t], pos);
+					v.ca[t] = vi * m_Op_CPML->c_E(1, loc_pos[0], loc_pos[1], loc_pos[2]);
+					v.ck[t] = vi * m_Op_CPML->c_E(2, loc_pos[0], loc_pos[1], loc_pos[2]);
+					i.ca[t] = iv * m_Op_CPML->c_H(1, loc_pos[0], loc_pos[1], loc_pos[2]);
+					i.ck[t] = iv * m_Op_CPML->c_H(2, loc_pos[0], loc_pos[1], loc_pos[2]);
+					v.psi[t] = 0;
+					i.psi[t] = 0;
+				}
+			}
+		}
+	}
 }
 
 Engine_Ext_CPML::~Engine_Ext_CPML()
@@ -92,24 +145,13 @@ void Engine_Ext_CPML::DoPostVoltageUpdatesImpl(EngType* eng, int threadID)
 				if (pos[d]>0)
 					--prev[d];
 
-				const FDTD_FLOAT b = m_Op_CPML->c_E(0, loc_pos[0], loc_pos[1], loc_pos[2]);
-				const FDTD_FLOAT a = m_Op_CPML->c_E(1, loc_pos[0], loc_pos[1], loc_pos[2]);
-				const FDTD_FLOAT k = m_Op_CPML->c_E(2, loc_pos[0], loc_pos[1], loc_pos[2]);
-
-				// E_c has +d(H_c+2)/d(c+1) - d(H_c+1)/d(c+2), same as Engine::UpdateVoltages
-				for (int c=0; c<3; ++c)
+				Cell& cell = m_volt[CellIndex(loc_pos)];
+				for (int t=0; t<2; ++t)
 				{
-					if (c==d)
-						continue;
-					const int e = 3 - c - d;
-					const FDTD_FLOAT sign = (d==(c+1)%3) ? 1 : -1;
-					FDTD_FLOAT dI = sign * (eng->EngType::GetCurr(e,pos) - eng->EngType::GetCurr(e,prev));
-
-					FDTD_FLOAT& psi = psi_volt(c, loc_pos[0], loc_pos[1], loc_pos[2]);
-					psi = b * psi + a * dI;
-
-					eng->EngType::SetVolt(c, pos, eng->EngType::GetVolt(c,pos) +
-						m_Op_CPML->m_Op->GetVI(c,pos) * (psi + k * dI));
+					const int c = m_comp[t];
+					FDTD_FLOAT diff = eng->EngType::GetCurr(m_diff[t],pos) - eng->EngType::GetCurr(m_diff[t],prev);
+					cell.psi[t] = cell.b * cell.psi[t] + cell.ca[t] * diff;
+					eng->EngType::SetVolt(c, pos, eng->EngType::GetVolt(c,pos) + cell.psi[t] + cell.ck[t] * diff);
 				}
 			}
 		}
@@ -174,24 +216,13 @@ void Engine_Ext_CPML::DoPostCurrentUpdatesImpl(EngType* eng, int threadID)
 				unsigned int next[3] = {pos[0], pos[1], pos[2]};
 				++next[d];
 
-				const FDTD_FLOAT b = m_Op_CPML->c_H(0, loc_pos[0], loc_pos[1], loc_pos[2]);
-				const FDTD_FLOAT a = m_Op_CPML->c_H(1, loc_pos[0], loc_pos[1], loc_pos[2]);
-				const FDTD_FLOAT k = m_Op_CPML->c_H(2, loc_pos[0], loc_pos[1], loc_pos[2]);
-
-				// H_c has -d(E_c+2)/d(c+1) + d(E_c+1)/d(c+2), same as Engine::UpdateCurrents
-				for (int c=0; c<3; ++c)
+				Cell& cell = m_curr[CellIndex(loc_pos)];
+				for (int t=0; t<2; ++t)
 				{
-					if (c==d)
-						continue;
-					const int e = 3 - c - d;
-					const FDTD_FLOAT sign = (d==(c+1)%3) ? -1 : 1;
-					FDTD_FLOAT dV = sign * (eng->EngType::GetVolt(e,next) - eng->EngType::GetVolt(e,pos));
-
-					FDTD_FLOAT& psi = psi_curr(c, loc_pos[0], loc_pos[1], loc_pos[2]);
-					psi = b * psi + a * dV;
-
-					eng->EngType::SetCurr(c, pos, eng->EngType::GetCurr(c,pos) +
-						m_Op_CPML->m_Op->GetIV(c,pos) * (psi + k * dV));
+					const int c = m_comp[t];
+					FDTD_FLOAT diff = eng->EngType::GetVolt(m_diff[t],next) - eng->EngType::GetVolt(m_diff[t],pos);
+					cell.psi[t] = cell.b * cell.psi[t] + cell.ca[t] * diff;
+					eng->EngType::SetCurr(c, pos, eng->EngType::GetCurr(c,pos) + cell.psi[t] + cell.ck[t] * diff);
 				}
 			}
 		}
