@@ -56,11 +56,12 @@ public:
 	/*!
 		Define the CPML absorption parameters.
 		Parameters:
-			kappa_max: Maximum kappa value (typically 15.0)
-			alpha_max: Maximum alpha value (typically 0.05)
+			kappa_max: Maximum kappa value (default 1)
+			alpha_max: Maximum alpha value (default 0.05)
 			sigma_max: Maximum sigma value (-1 for auto-calculate)
-			m: Grading order (typically 4.0)
-			reflection_coeff: Target reflection coefficient (typically 1e-16)
+			m: Grading order (default 3)
+			reflection_coeff: Target reflection coefficient for the auto sigma_max;
+			                  if not in (0,1), sigma_max = 0.5*0.8*(m+1)/(Z0*delta)
 	*/
 	virtual void SetCPMLParameters(double kappa_max, double alpha_max, double sigma_max,
 	                               double m, double reflection_coeff);
@@ -75,8 +76,8 @@ public:
 
 	//! Create the CPML
 	static bool Create_CPML(Operator* op, const int ui_BC[6], const unsigned int ui_size[6],
-	                        double kappa_max = 15.0, double alpha_max = 0.05, double sigma_max = -1.0,
-	                        double m = 4.0, double reflection_coeff = 1e-16);
+	                        double kappa_max = 1.0, double alpha_max = 0.05, double sigma_max = -1.0,
+	                        double m = 3.0, double reflection_coeff = 0);
 
 protected:
 	Operator_Ext_CPML(Operator* op);

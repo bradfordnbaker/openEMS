@@ -338,7 +338,6 @@ cdef class openEMS:
         Enable or disable CPML (Convolutional Perfectly Matched Layer) absorbing boundary conditions.
 
         When enabled, CPML will be used instead of the default UPML for PML boundaries.
-        CPML typically provides better absorption with improved stability characteristics.
 
         :param enable: bool -- Enable (True, default) or Disable (False) CPML
 
@@ -353,7 +352,7 @@ cdef class openEMS:
 
         Set the maximum kappa stretching parameter for CPML.
 
-        :param val: float -- Maximum kappa value (default=15.0, typical range: 5-20)
+        :param val: float -- Maximum kappa value (default=1.0)
         """
         self.thisptr.SetCPMLKappaMax(val)
 
@@ -372,7 +371,8 @@ cdef class openEMS:
         Set the maximum conductivity (sigma) for CPML.
 
         :param val: float -- Maximum sigma value (default=-1.0 for auto-calculation)
-                            Use -1.0 to auto-calculate from reflection coefficient
+                            Auto is 0.5*0.8*(m+1)/(Z0*delta) with delta the mean PML cell
+                            size, or from the reflection coefficient if one is set
         """
         self.thisptr.SetCPMLSigmaMax(val)
 
@@ -381,7 +381,7 @@ cdef class openEMS:
 
         Set the polynomial grading order for CPML parameters.
 
-        :param val: float -- Grading order (default=4.0, typical values: 3.0-4.0)
+        :param val: float -- Grading order (default=3.0)
         """
         self.thisptr.SetCPMLGradingOrder(val)
 
@@ -390,9 +390,10 @@ cdef class openEMS:
 
         Set the target reflection coefficient for CPML.
 
-        This value is used to auto-calculate sigma_max if not explicitly set.
+        If set (0 < val < 1), sigma_max is auto-calculated from it as
+        -(m+1)*ln(val)/(2*Z0*d), d the PML thickness, unless sigma_max is set.
 
-        :param val: float -- Reflection coefficient (default=1e-16, typical: 1e-12 to 1e-20)
+        :param val: float -- Reflection coefficient (default unset)
         """
         self.thisptr.SetCPMLReflectionCoeff(val)
 

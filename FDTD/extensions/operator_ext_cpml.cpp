@@ -24,12 +24,12 @@ using namespace std;
 
 Operator_Ext_CPML::Operator_Ext_CPML(Operator* op) : Operator_Extension(op)
 {
-	// Default CPML parameters (Roden & Gedney 2000)
-	m_kappa_max = 15.0;
+	// Default CPML parameters, see Create_CPML()
+	m_kappa_max = 1.0;
 	m_alpha_max = 0.05;
 	m_sigma_max = -1.0;  // Auto-calculate
-	m_grading_order = 4.0;
-	m_reflection_coeff = 1e-16;
+	m_grading_order = 3.0;
+	m_reflection_coeff = 0;  // unset, sigma_max = 0.5*sigma_opt
 
 	m_dir = 0;
 	m_upper = false;
@@ -136,8 +136,16 @@ void Operator_Ext_CPML::CalcCoefficients(const unsigned int pos[3], bool isH, do
 
 	const double m = m_grading_order;
 	double sigma_max = m_sigma_max;
-	if (sigma_max < 0)
+	if ((sigma_max < 0) && (m_reflection_coeff > 0) && (m_reflection_coeff < 1))
 		sigma_max = -(m + 1.0) * log(m_reflection_coeff) / (2.0 * Z0 * width);
+	else if (sigma_max < 0)
+	{
+		// half the usual optimum 0.8*(m+1)/(Z0*delta), delta the mean cell size
+		const unsigned int numCells = m_Size[2*n + m_upper];
+		if (numCells == 0)
+			return;
+		sigma_max = 0.5 * 0.8 * (m + 1.0) / (Z0 * width / numCells);
+	}
 
 	double kappa = 1.0 + (m_kappa_max - 1.0) * pow(depth / width, m);
 	double alpha = m_alpha_max * pow((width - depth) / width, m);
