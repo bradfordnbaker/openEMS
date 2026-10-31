@@ -18,7 +18,9 @@
 #include <fstream>
 #include <algorithm>
 #include <stdexcept>
+#include <thread>
 #include "operator.h"
+#include "tools/useful.h"
 #include "engine.h"
 #include "extensions/operator_extension.h"
 #include "extensions/operator_ext_excitation.h"
@@ -51,6 +53,7 @@ Operator::Operator() : Operator_Base()
 	m_Exc = 0;
 	m_InvaildTimestep = false;
 	m_TimeStepVar = 3;
+	m_numThreads = 0;
 }
 
 Operator::~Operator()
@@ -1796,8 +1799,49 @@ bool Operator::Calc_EC()
 	}
 
 	MainOp->SetPos(0,0,0);
-	Calc_EC_Range(0,numLines[0]-1);
+
+	unsigned int numThreads = GetBuildThreads();
+	std::vector<unsigned int> start, stop;
+	CalcStartStopLines(numThreads, start, stop);
+	if (g_settings.GetVerboseLevel()>0)
+		cout << "Building the operator on " << numThreads << " threads." << endl;
+
+	std::vector<std::thread> threads;
+	for (unsigned int n=0; n<numThreads; ++n)
+		threads.push_back(std::thread(&Operator::Calc_EC_Range, this, start.at(n), stop.at(n)));
+	for (size_t n=0; n<threads.size(); ++n)
+		threads[n].join();
 	return true;
+}
+
+unsigned int Operator::GetBuildThreads() const
+{
+	if ((m_numThreads==0) || (m_numThreads>AvailableThreads()))
+		return AvailableThreads();
+	return m_numThreads;
+}
+
+void Operator::CalcStartStopLines(
+	unsigned int &numThreads,
+	std::vector<unsigned int> &start,
+	std::vector<unsigned int> &stop
+) const
+{
+	std::vector<unsigned int> jpt = AssignJobs2Threads(numLines[0], numThreads, true);
+
+	numThreads = jpt.size();
+
+	start.resize(numThreads);
+	stop.resize(numThreads);
+
+	start.at(0)=0;
+	stop.at(0)=jpt.at(0)-1;
+
+	for (unsigned int n=1; n<numThreads; n++)
+	{
+		start.at(n) = stop.at(n-1)+1;
+		stop.at(n) = start.at(n) + jpt.at(n) - 1;
+	}
 }
 
 std::vector<CSPrimitives*>
@@ -2017,11 +2061,23 @@ double Operator::CalcTimestep_Var3()
 
 bool Operator::CalcPEC()
 {
-	m_Nr_PEC[0]=0;
-	m_Nr_PEC[1]=0;
-	m_Nr_PEC[2]=0;
+	unsigned int numThreads = GetBuildThreads();
+	std::vector<unsigned int> start, stop;
+	CalcStartStopLines(numThreads, start, stop);
 
-	CalcPEC_Range(0,numLines[0]-1,m_Nr_PEC);
+	std::vector<unsigned int> counter(3*numThreads, 0);   // three PEC counters per thread, summed up below
+	std::vector<std::thread> threads;
+	for (unsigned int n=0; n<numThreads; ++n)
+		threads.push_back(std::thread(&Operator::CalcPEC_Range, this, start.at(n), stop.at(n), &counter[3*n]));
+	for (size_t n=0; n<threads.size(); ++n)
+		threads[n].join();
+
+	for (int n=0; n<3; ++n)
+	{
+		m_Nr_PEC[n] = 0;
+		for (unsigned int t=0; t<numThreads; ++t)
+			m_Nr_PEC[n] += counter[3*t+n];
+	}
 
 	CalcPEC_Curves();
 

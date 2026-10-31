@@ -241,9 +241,25 @@ public:
 		CSProperties::PropertyType type=CSProperties::ANY
 	) const;
 
+	//! Number of threads that build the operator, 0 (the default) for AvailableThreads(). More than AvailableThreads() are limited to it.
+	void SetNumThreads(unsigned int numThreads) {m_numThreads = numThreads;}
+	//! The number of threads as set by SetNumThreads(), 0 for AvailableThreads().
+	unsigned int GetNumThreads() const {return m_numThreads;}
+
+	//! Split the lines in x-direction into ranges for up to \a numThreads threads; \a numThreads returns the number of ranges. Used for the operator build and by Engine_Multithread.
+	virtual void CalcStartStopLines(
+		unsigned int &numThreads,
+		std::vector<unsigned int> &start,
+		std::vector<unsigned int> &stop
+	) const;
+
 protected:
 	//! use New() for creating a new Operator
 	Operator();
+
+	unsigned int m_numThreads; //!< see SetNumThreads()
+	//! The number of threads the operator build uses, from m_numThreads and AvailableThreads().
+	unsigned int GetBuildThreads() const;
 
 	virtual void Init();
 	void Delete();

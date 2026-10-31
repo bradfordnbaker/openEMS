@@ -56,7 +56,7 @@ Operator_CylinderMultiGrid* Operator_CylinderMultiGrid::New(
 	}
 	cout << "Create cylindrical multi grid FDTD operator " << endl;
 	Operator_CylinderMultiGrid* op = new Operator_CylinderMultiGrid(Split_Radii, level);
-	op->setNumThreads(numThreads);
+	op->SetNumThreads(numThreads);
 	op->Init();
 
 	return op;
@@ -67,7 +67,7 @@ Engine* Operator_CylinderMultiGrid::CreateEngine()
 	if (UseGPU())
 		m_Engine = Engine_GPU_CylinderMultiGrid::New(this, TakeGPUBackend(), m_GPU_Parent);
 	else
-		m_Engine = Engine_CylinderMultiGrid::New(this, m_orig_numThreads);
+		m_Engine = Engine_CylinderMultiGrid::New(this, m_numThreads);
 	return m_Engine;
 }
 

@@ -32,7 +32,7 @@ Operator_Cylinder* Operator_Cylinder::New(unsigned int numThreads)
 {
 	cout << "Create cylindrical FDTD operator" << endl;
 	Operator_Cylinder* op = new Operator_Cylinder();
-	op->setNumThreads(numThreads);
+	op->SetNumThreads(numThreads);
 	op->Init();
 	return op;
 }
@@ -67,7 +67,7 @@ Engine* Operator_Cylinder::CreateEngine()
 		return m_Engine;
 	}
 	//! create a special cylindrical-engine
-	m_Engine = Engine_Cylinder::New(this, m_orig_numThreads);
+	m_Engine = Engine_Cylinder::New(this, m_numThreads);
 	return m_Engine;
 }
 
