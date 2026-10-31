@@ -78,9 +78,9 @@ void Operator::SetEngineKind(EngineKind kind)
 	if (kind==m_EngineKind)
 		return;
 	m_EngineKind = kind;
-	// the GPU backends read the coefficients through GetVV() and friends, in any layout:
-	// the compressed one is the smallest on the host when they make their copy
-	if (kind==ENGINE_BASIC)
+	// the GPU backends read the coefficients through GetVV() and friends, in any layout; the
+	// basic one is the fastest to build and read (the HIP backend makes its own sets anyway)
+	if (kind!=ENGINE_SSE)
 		SetCoeffs(new Coeffs_Basic());
 	else
 		SetCoeffs(new Coeffs_SSE_Compressed());

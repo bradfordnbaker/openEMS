@@ -59,7 +59,7 @@ public:
 
 	//! The engine the operator creates (CreateEngine()) and builds its coefficients for
 	enum EngineKind {ENGINE_BASIC, ENGINE_SSE, ENGINE_GPU};
-	//! Choose the engine, and with it the layout of the coefficients (Coeffs_Basic for the basic engine, else Coeffs_SSE_Compressed); before the operator is built
+	//! Choose the engine, and with it the layout of the coefficients (Coeffs_SSE_Compressed for the SSE engine, else Coeffs_Basic); before the operator is built
 	virtual void SetEngineKind(EngineKind kind);
 	EngineKind GetEngineKind() const {return m_EngineKind;}
 	//! The backend of a GPU engine (see GPU_Backend::New), which the operator takes over and hands on to its engine

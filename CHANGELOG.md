@@ -111,10 +111,10 @@ there are unreleased changes. It becomes the next release entry.
 - A cylindrical mesh runs on the engine chosen with `--engine`; `basic` was
   ignored there and the multithreaded engine ran. A cylindrical multi-grid
   mesh needs `multithreaded` or `gpu`; `--engine=basic` is an error for it.
-- The GPU engine needs less host memory in the setup: the operator keeps its
-  update coefficients compressed until the backend has copied them, and
-  frees them afterwards also on a cylindrical mesh. With the reference
-  backend the peak of an 8 MCell Cartesian model drops by about 30 %.
+- The GPU engine on a cylindrical mesh builds the plain host coefficients
+  instead of the compressed SSE ones, and frees them once the device has
+  them, as on a Cartesian mesh: with HIP the setup of an 8 MCell model takes
+  5.6 instead of 6.2 s and 952 instead of 986 MiB.
 
 ### Build
 
