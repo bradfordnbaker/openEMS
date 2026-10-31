@@ -108,9 +108,9 @@ there are unreleased changes. It becomes the next release entry.
   (`engine='sse'`...) are now other names of `multithreaded`; they and `basic`
   ran on a single thread before. The results do not change. The operator is
   built on all threads with every engine, which halves the setup of `basic`.
-- A cylindrical mesh runs on the engine chosen with `--engine`; `basic` was
-  ignored there and the multithreaded engine ran. A cylindrical multi-grid
-  mesh needs `multithreaded` or `gpu`; `--engine=basic` is an error for it.
+- A cylindrical mesh, also with multi-grid levels, runs on the engine chosen
+  with `--engine`; `basic` was ignored there and the multithreaded engine
+  ran.
 - The grids of a cylindrical multi-grid mesh are stepped one after the other
   by the same threads instead of by one thread pool each, with the same
   results. With the default thread count the inner grids no longer stay on a

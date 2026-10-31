@@ -19,6 +19,7 @@
 
 #include "engine_gpu_cylindermultigrid.h"
 #include "operator_cylindermultigrid.h"
+#include "engine_subgrid.h"
 
 using std::cout;
 using std::cerr;
@@ -58,20 +59,7 @@ void Engine_GPU_CylinderMultiGrid::Init()
 	// this grid: backend, extensions, device or host fallback
 	Engine_GPU::Init();
 
-	m_Interpol.split_pos = Op_CMG->m_Split_Pos;
-	for (int n=0; n<2; ++n)
-		for (unsigned int a=0; a<numLines[1]; ++a)
-		{
-			m_Interpol.pos_v_2p[n].push_back(Op_CMG->m_interpol_pos_v_2p[n][a]);
-			m_Interpol.pos_v_2pp[n].push_back(Op_CMG->m_interpol_pos_v_2pp[n][a]);
-			m_Interpol.pos_i_2p[n].push_back(Op_CMG->m_interpol_pos_i_2p[n][a]);
-			m_Interpol.pos_i_2pp[n].push_back(Op_CMG->m_interpol_pos_i_2pp[n][a]);
-			// all four lanes of the SIMD coefficients are the same
-			m_Interpol.w_v_2p[n].push_back(Op_CMG->f4_interpol_v_2p[n][a].f[0]);
-			m_Interpol.w_v_2pp[n].push_back(Op_CMG->f4_interpol_v_2pp[n][a].f[0]);
-			m_Interpol.w_i_2p[n].push_back(Op_CMG->f4_interpol_i_2p[n][a].f[0]);
-			m_Interpol.w_i_2pp[n].push_back(Op_CMG->f4_interpol_i_2pp[n][a].f[0]);
-		}
+	Op_CMG->GetInterpolation(m_Interpol);
 
 	// the sub-grid engine, created by its operator on a backend sharing our work stream
 	Operator_Cylinder* inner_op = Op_CMG->GetInnerOperator();
@@ -139,7 +127,7 @@ void Engine_GPU_CylinderMultiGrid::NextTimestep()
 
 void Engine_GPU_CylinderMultiGrid::FinishBatch()
 {
-	// the sub-grid first interpolates from its own sub-grids (see Engine_CylinderMultiGrid::IterateTS())
+	// the sub-grid first interpolates from its own sub-grids (see Engine_ThreadPool::IterateTS())
 	m_InnerEngine->FinishBatch();
 	if (m_Link)
 		m_Link->InterpolateToBase();
@@ -153,42 +141,13 @@ void Engine_GPU_CylinderMultiGrid::FinishBatch()
 	Engine_GPU::FinishBatch();
 }
 
-// see Engine_CylinderMultiGrid::SyncSubGridVoltages()
+// the coupling on the host mirrors, see SubGrid_Coupling_Basic
 void Engine_GPU_CylinderMultiGrid::HostSyncVoltages()
 {
-	if (m_Interpol.split_pos<1)
-		return;
-	ArrayLib::ArrayNIJK<FDTD_FLOAT>& base = *volt_ptr;
-	ArrayLib::ArrayNIJK<FDTD_FLOAT>& sub = m_InnerEngine->HostVoltages();
-	const unsigned int r = m_Interpol.split_pos-1;
-	for (unsigned int a=0; a<numLines[1]-1; a+=2)
-	{
-		const unsigned int h = a/2;
-		for (unsigned int z=0; z<numLines[2]; ++z)
-		{
-			sub(0, r, h, z) = 0;
-			sub(2, r, h, z) = base(2, r, a, z);
-			sub(1, r, h, z) = base(1, r, a, z) + base(1, r, a+1, z);
-		}
-	}
+	SubGrid_Coupling_Basic::SyncVoltages(*volt_ptr, m_InnerEngine->HostVoltages(), m_Interpol, numLines);
 }
 
-// see Engine_CylinderMultiGrid::InterpolVoltChild2Base() and InterpolCurrChild2Base()
 void Engine_GPU_CylinderMultiGrid::HostInterpolate(ArrayLib::ArrayNIJK<FDTD_FLOAT>& base, const ArrayLib::ArrayNIJK<FDTD_FLOAT>& sub, bool currents, unsigned int r)
 {
-	const std::vector<unsigned int>* pos_2p  = currents ? m_Interpol.pos_i_2p  : m_Interpol.pos_v_2p;
-	const std::vector<unsigned int>* pos_2pp = currents ? m_Interpol.pos_i_2pp : m_Interpol.pos_v_2pp;
-	const std::vector<float>* w_2p  = currents ? m_Interpol.w_i_2p  : m_Interpol.w_v_2p;
-	const std::vector<float>* w_2pp = currents ? m_Interpol.w_i_2pp : m_Interpol.w_v_2pp;
-	for (unsigned int a=0; a<numLines[1]; ++a)
-	{
-		for (unsigned int z=0; z<numLines[2]; ++z)
-		{
-			//r and z direction
-			base(0, r, a, z) = w_2p[0][a]*sub(0, r, pos_2p[0][a], z) + w_2pp[0][a]*sub(0, r, pos_2pp[0][a], z);
-			base(2, r, a, z) = w_2p[0][a]*sub(2, r, pos_2p[0][a], z) + w_2pp[0][a]*sub(2, r, pos_2pp[0][a], z);
-			//alpha direction
-			base(1, r, a, z) = w_2p[1][a]*sub(1, r, pos_2p[1][a], z) + w_2pp[1][a]*sub(1, r, pos_2pp[1][a], z);
-		}
-	}
+	SubGrid_Coupling_Basic::Interpolate(base, sub, m_Interpol, currents, r, numLines);
 }

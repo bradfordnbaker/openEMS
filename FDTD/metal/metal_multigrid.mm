@@ -18,7 +18,7 @@
 #include "metal_internal.h"
 
 // Coupling of a cylindrical multi-grid level (base) and its sub-grid, see
-// Engine_CylinderMultiGrid (SyncSubGridVoltages() and friends). Both grids share the
+// SubGrid_Coupling_SSE and SubGrid_Coupling_Basic. Both grids share the
 // Metal context, so the kernels run in order with the updates of both grids.
 static const char* MULTIGRID_SOURCE = R"MSL(
 // base grid voltages at r line r to the sub-grid (every other alpha line); gid = (z, a/2)

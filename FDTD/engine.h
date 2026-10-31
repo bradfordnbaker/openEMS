@@ -25,6 +25,7 @@
 
 class Engine_Extension;
 class Engine_ThreadPool;
+class Engine_SubGridCoupling;
 
 class Engine
 {
@@ -125,14 +126,16 @@ public:
 
 	EngineType GetType() const {return m_type;}
 
-	//! The engine of the sub-grid of a cylindrical multi-grid level, NULL without one; the threads of this engine step it right after this engine in every half step (Engine_ThreadPool)
-	virtual Engine* GetSubGridEngine() const {return NULL;}
+	//! The sub-grid of a cylindrical multi-grid level: its engine (of the same type) and the coupling of the two, both taken over
+	void SetSubGrid(Engine* sub, Engine_SubGridCoupling* coupling);
+	//! The engine of the sub-grid, NULL without one; the threads of this engine step it right after this engine in every half step (Engine_ThreadPool)
+	Engine* GetSubGridEngine() const {return m_SubGrid;}
 	//! Couple this grid and its sub-grid, once both did their voltage half step
-	virtual void SyncSubGridVoltages() {}
+	void SyncSubGridVoltages();
 	//! Couple this grid and its sub-grid, once both did their current half step
-	virtual void SyncSubGridCurrents() {}
+	void SyncSubGridCurrents();
 	//! Fill this grid from its sub-grid, at the end of IterateTS() (the sub-grid filled from its own first)
-	virtual void InterpolateFromSubGrid() {}
+	void InterpolateFromSubGrid();
 
 protected:
 	EngineType m_type;
@@ -152,6 +155,10 @@ protected:
 
 	friend class Engine_ThreadPool;
 	friend class Engine_ThreadPool_Worker;
+	friend class SubGrid_Coupling_Basic;
+
+	Engine* m_SubGrid;                        //!< see SetSubGrid()
+	Engine_SubGridCoupling* m_SubGridCoupling;
 
 	unsigned int m_numThreads;        //!< see SetNumThreads()
 	Engine_ThreadPool* m_ThreadPool;  //!< the worker threads of a CPU engine, created by the first IterateTS()

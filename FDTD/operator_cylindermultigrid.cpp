@@ -17,7 +17,8 @@
 
 #include "operator_cylindermultigrid.h"
 #include "engine_gpu_cylindermultigrid.h"
-#include "engine_cylindermultigrid.h"
+#include "engine_sse.h"
+#include "engine_subgrid.h"
 #include "extensions/operator_ext_cylinder.h"
 #include "tools/useful.h"
 #include "CSUseful.h"
@@ -36,8 +37,6 @@ Operator_CylinderMultiGrid::Operator_CylinderMultiGrid(
 	m_Split_Rad = m_Split_Radii.back();
 	m_Split_Radii.pop_back();
 	m_MultiGridLevel = level;
-	// not the basic engine; Operator:: as the inner operator is created by Init()
-	Operator::SetEngineKind(ENGINE_SSE);
 }
 
 Operator_CylinderMultiGrid::~Operator_CylinderMultiGrid()
@@ -64,10 +63,26 @@ Operator_CylinderMultiGrid* Operator_CylinderMultiGrid::New(
 	return op;
 }
 
+void Operator_CylinderMultiGrid::GetInterpolation(GPU_MultiGridInterpolation& interpol) const
+{
+	interpol.split_pos = m_Split_Pos;
+	for (int n=0; n<2; ++n)
+		for (unsigned int a=0; a<numLines[1]; ++a)
+		{
+			interpol.pos_v_2p[n].push_back(m_interpol_pos_v_2p[n][a]);
+			interpol.pos_v_2pp[n].push_back(m_interpol_pos_v_2pp[n][a]);
+			interpol.pos_i_2p[n].push_back(m_interpol_pos_i_2p[n][a]);
+			interpol.pos_i_2pp[n].push_back(m_interpol_pos_i_2pp[n][a]);
+			// all four lanes of the SIMD coefficients are the same
+			interpol.w_v_2p[n].push_back(f4_interpol_v_2p[n][a].f[0]);
+			interpol.w_v_2pp[n].push_back(f4_interpol_v_2pp[n][a].f[0]);
+			interpol.w_i_2p[n].push_back(f4_interpol_i_2p[n][a].f[0]);
+			interpol.w_i_2pp[n].push_back(f4_interpol_i_2pp[n][a].f[0]);
+		}
+}
+
 void Operator_CylinderMultiGrid::SetEngineKind(EngineKind kind)
 {
-	if (kind==ENGINE_BASIC)
-		throw std::runtime_error("a cylindrical multi-grid mesh needs the multithreaded or the GPU engine, not the basic engine");
 	Operator_Cylinder::SetEngineKind(kind);
 	m_InnerOp->SetEngineKind(kind);
 }
@@ -81,7 +96,22 @@ Engine* Operator_CylinderMultiGrid::CreateEngine()
 		m_Coeffs->Free();
 	}
 	else
-		m_Engine = Engine_CylinderMultiGrid::New(this, m_numThreads);
+	{
+		// the engine of this grid, of the chosen type, and the sub-grid (created by its operator,
+		// so the field processing finds it) with the coupling for the field layout
+		Engine* sub = m_InnerOp->CreateEngine();
+		if (m_EngineKind==ENGINE_SSE)
+		{
+			Engine_sse* eng = Engine_sse::New(this, m_numThreads);
+			eng->SetSubGrid(sub, new SubGrid_Coupling_SSE(eng, dynamic_cast<Engine_sse*>(sub), this));
+			m_Engine = eng;
+		}
+		else
+		{
+			m_Engine = Engine::New(this, m_numThreads);
+			m_Engine->SetSubGrid(sub, new SubGrid_Coupling_Basic(m_Engine, sub, this));
+		}
+	}
 	return m_Engine;
 }
 

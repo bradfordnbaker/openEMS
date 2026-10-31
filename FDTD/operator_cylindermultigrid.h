@@ -21,6 +21,7 @@
 #define CYLIDINDERMULTIGRID_LIMIT 20
 
 #include "operator_cylinder.h"
+#include "gpu_backend.h"
 
 //! This is a cylindrical FDTD operator using a simple multi-grid approach.
 /*!
@@ -30,7 +31,7 @@
   */
 class Operator_CylinderMultiGrid : public Operator_Cylinder
 {
-	friend class Engine_CylinderMultiGrid;
+	friend class SubGrid_Coupling_SSE;
 	friend class Engine_GPU_CylinderMultiGrid;
 public:
 	static Operator_CylinderMultiGrid* New(
@@ -43,7 +44,7 @@ public:
 
 	virtual double GetNumberCells() const;
 
-	//! The engine of every grid level: the multithreaded SSE engine or the GPU (not the basic engine, see Engine_CylinderMultiGrid)
+	//! The engine of every grid level
 	virtual void SetEngineKind(EngineKind kind);
 	virtual Engine* CreateEngine();
 
@@ -62,6 +63,9 @@ public:
 	int GetMultiGridLevel() const {return m_MultiGridLevel;}
 
 	Operator_Cylinder* GetInnerOperator() const {return m_InnerOp;}
+
+	//! The interpolation of the sub-grid to this grid as plain floats (all lanes of the SSE coefficients are the same)
+	void GetInterpolation(GPU_MultiGridInterpolation& interpol) const;
 
 	virtual void SetExcitationSignal(Excitation* exc);
 

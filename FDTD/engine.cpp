@@ -19,6 +19,7 @@
 #include "extensions/engine_extension.h"
 #include "extensions/operator_extension.h"
 #include "engine_threadpool.h"
+#include "engine_subgrid.h"
 
 using std::cout;
 using std::endl;
@@ -45,11 +46,42 @@ Engine::Engine(const Operator* op)
 	curr_ptr = NULL;
 	m_numThreads = 0;
 	m_ThreadPool = NULL;
+	m_SubGrid = NULL;
+	m_SubGridCoupling = NULL;
 }
 
 Engine::~Engine()
 {
+	// the threads first, they step the sub-grid too
 	this->Reset();
+	delete m_SubGridCoupling;
+	delete m_SubGrid;
+}
+
+void Engine::SetSubGrid(Engine* sub, Engine_SubGridCoupling* coupling)
+{
+	delete m_SubGridCoupling;
+	delete m_SubGrid;
+	m_SubGrid = sub;
+	m_SubGridCoupling = coupling;
+}
+
+void Engine::SyncSubGridVoltages()
+{
+	if (m_SubGridCoupling)
+		m_SubGridCoupling->SyncVoltages();
+}
+
+void Engine::SyncSubGridCurrents()
+{
+	if (m_SubGridCoupling)
+		m_SubGridCoupling->SyncCurrents();
+}
+
+void Engine::InterpolateFromSubGrid()
+{
+	if (m_SubGridCoupling)
+		m_SubGridCoupling->Interpolate();
 }
 
 void Engine::Init()

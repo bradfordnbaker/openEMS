@@ -847,11 +847,6 @@ bool openEMS::SetupOperator()
 
 	if (CylinderCoords)
 	{
-		if ((m_CC_MultiGrid.size()>0) && (kind == Operator::ENGINE_BASIC))
-		{
-			cerr << "openEMS::SetupFDTD: Error: a cylindrical multi-grid mesh needs --engine=multithreaded or gpu, not basic" << endl;
-			return false;
-		}
 		Operator_Cylinder* op_cyl = NULL;
 		if (m_CC_MultiGrid.size()>0)
 			op_cyl = Operator_CylinderMultiGrid::New(m_CC_MultiGrid, m_engine_numThreads);

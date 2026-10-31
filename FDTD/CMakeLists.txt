@@ -54,7 +54,7 @@ set(SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/engine_sse.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/excitation.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/operator_cylindermultigrid.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/engine_cylindermultigrid.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/engine_subgrid.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/engine_interface_fdtd.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/engine_interface_sse_fdtd.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/engine_interface_gpu_fdtd.cpp

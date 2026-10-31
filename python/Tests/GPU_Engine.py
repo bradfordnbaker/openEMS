@@ -3,8 +3,7 @@
  GPU engine test — comparison with the basic engine
 
  Each case runs with engine='basic', engine='gpu-reference' and engine='gpu'
- and compares all probe files and all HDF5 field dumps. A multi-grid mesh does
- not run on the basic engine, there the CPU reference is engine='multithreaded'.
+ and compares all probe files and all HDF5 field dumps.
 
  The reference backend performs the main FDTD updates on the CPU on its own
  copy of the fields, exactly like the basic engine, so its results must be
@@ -33,8 +32,7 @@
    device backend, cases coeff_index32 and coeff_full: the update coefficients as sets with
      a 32 bit index, and as full arrays (FULL_DEVICE_BACKENDS)
    reference backend: all probe data and field dumps bit-identical
-   cylindrical cases: engine='multithreaded' bit-identical to engine='basic'
-   case multigrid: engine='basic' fails the setup
+   cylindrical and multi-grid cases: engine='multithreaded' bit-identical to engine='basic'
    device backend: max. deviation < 1e-4 of the peak value, per probe file and per field dump
      (skipped without a GPU device)
 
@@ -640,10 +638,9 @@ FULL_DEVICE_BACKENDS = ('HIP', 'Metal')
 DEVICE_DFT_BACKENDS = ('HIP',)
 for name, case, on_device in cases:
     print(f'Testing case: {name}')
-    # the CPU reference: a multi-grid mesh does not run on the basic engine
-    cpu = 'multithreaded' if name.startswith('multigrid') else 'basic'
+    cpu = 'basic'   # the CPU reference
     engines = (cpu, 'gpu-reference', 'gpu')
-    if name.startswith('cylinder'):
+    if name.startswith(('cylinder', 'multigrid')):
         engines += ('multithreaded',)   # the basic engine on a cylindrical mesh against the default one
     paths = {engine: os.path.join(tempfile.gettempdir(), f'GPU_Engine_{name}_{engine}') for engine in engines}
     os.environ.update(CASE_ENV.get(name, {}))
@@ -665,11 +662,6 @@ for name, case, on_device in cases:
     if 'multithreaded' in engines and cpu=='basic':
         diff, _, _, _ = compare_outputs(paths['basic'], paths['multithreaded'])
         assert not diff, f'FAIL [{name}]: the multithreaded engine differs from the basic engine in: {", ".join(n for n, _ in diff)}'
-
-    if name=='multigrid':
-        FDTD, CSX = case()
-        rc = FDTD.Run(os.path.join(tempfile.gettempdir(), f'GPU_Engine_{name}_basic'), cleanup=True, engine='basic')
-        assert rc, f'FAIL [{name}]: engine=basic ran a multi-grid mesh'
 
     if name=='cylinder_closed':
         # the H and the B field are interpolated alike, also on the alpha seam of the mesh

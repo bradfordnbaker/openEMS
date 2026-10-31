@@ -88,7 +88,7 @@ public:
 	virtual void SyncCurrents() = 0;
 	//! Interpolate the sub-grid fields to the base grid inside the sub-grid (r lines below split_pos-1 / split_pos-2)
 	/*!
-	  Called at the end of a batch, like Engine_CylinderMultiGrid::IterateTS(),
+	  Called at the end of a batch, like Engine::InterpolateFromSubGrid(),
 	  not in every timestep.
 	  */
 	virtual void InterpolateToBase() = 0;

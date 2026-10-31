@@ -84,8 +84,6 @@ public:
 	}
 
 protected:
-	friend class Engine_CylinderMultiGrid;
-
 	Engine_sse(const Operator* op);
 
 	virtual void UpdateVoltages(unsigned int startX, unsigned int numX);

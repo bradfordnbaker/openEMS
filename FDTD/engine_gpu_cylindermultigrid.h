@@ -23,12 +23,11 @@
 
 class Operator_CylinderMultiGrid;
 
-//! GPU engine for a cylindrical multi-grid level, see Engine_CylinderMultiGrid
+//! GPU engine for a cylindrical multi-grid level, see Engine::SetSubGrid() and Engine_SubGridCoupling
 /*!
   Owns the engine of the sub-grid (created by the inner operator, so the field
-  processing finds it), whose backend shares the device work stream. The CPU
-  engine runs both grids in threads synchronized by barriers; the order they
-  enforce is run here directly, in every half-step:
+  processing finds it), whose backend shares the device work stream. The order
+  is the one of the CPU engines (Engine_ThreadPool), in every half-step:
   this grid, the sub-grid (recursively with its own sub-grids), then the
   coupling (base voltages to the sub-grid, sub-grid currents to the base).
   At the end of a batch the sub-grid fields are interpolated to the base grid.
