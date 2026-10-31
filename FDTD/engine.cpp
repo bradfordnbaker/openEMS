@@ -18,16 +18,18 @@
 #include "engine.h"
 #include "extensions/engine_extension.h"
 #include "extensions/operator_extension.h"
+#include "engine_threadpool.h"
 
 using std::cout;
 using std::endl;
 
 //! \brief construct an Engine instance
 //! it's the responsibility of the caller to free the returned pointer
-Engine* Engine::New(const Operator* op)
+Engine* Engine::New(const Operator* op, unsigned int numThreads)
 {
-	cout << "Create FDTD engine" << endl;
+	cout << "Create FDTD engine (basic + multi-threading)" << endl;
 	Engine* e = new Engine(op);
+	e->SetNumThreads(numThreads);
 	e->Init();
 	return e;
 }
@@ -41,6 +43,8 @@ Engine::Engine(const Operator* op)
 		numLines[n] = Op->GetNumberOfLines(n, true);
 	volt_ptr = NULL;
 	curr_ptr = NULL;
+	m_numThreads = 0;
+	m_ThreadPool = NULL;
 }
 
 Engine::~Engine()
@@ -99,6 +103,10 @@ void Engine::SortExtensionByPriority()
 
 void Engine::Reset()
 {
+	// the threads first, they use the fields and extensions
+	delete m_ThreadPool;
+	m_ThreadPool = NULL;
+
 	delete volt_ptr;
 	volt_ptr = NULL;
 	delete curr_ptr;
@@ -268,21 +276,14 @@ void Engine::Apply2Current()
 
 bool Engine::IterateTS(unsigned int iterTS)
 {
-	for (unsigned int iter=0; iter<iterTS; ++iter)
-	{
-		//voltage updates with extensions
-		DoPreVoltageUpdates();
-		UpdateVoltages(0,numLines[0]);
-		DoPostVoltageUpdates();
-		Apply2Voltages();
-
-		//current updates with extensions
-		DoPreCurrentUpdates();
-		UpdateCurrents(0,numLines[0]-1);
-		DoPostCurrentUpdates();
-		Apply2Current();
-
-		++numTS;
-	}
+	if (m_ThreadPool==NULL)
+		m_ThreadPool = new Engine_ThreadPool(this, m_numThreads);
+	m_ThreadPool->IterateTS(iterTS);
 	return true;
+}
+
+void Engine::NextInterval(float curr_speed)
+{
+	if (m_ThreadPool)
+		m_ThreadPool->NextInterval(curr_speed);
 }

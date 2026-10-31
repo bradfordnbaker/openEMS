@@ -26,12 +26,12 @@ Engine_CylinderMultiGrid* Engine_CylinderMultiGrid::New(const Operator_CylinderM
 {
 	cout << "Create FDTD engine (cylindrical multi grid mesh using sse compression + multithreading)" << endl;
 	Engine_CylinderMultiGrid* e = new Engine_CylinderMultiGrid(op);
-	e->setNumThreads( numThreads );
+	e->SetNumThreads( numThreads );
 	e->Init();
 	return e;
 }
 
-Engine_CylinderMultiGrid::Engine_CylinderMultiGrid(const Operator_CylinderMultiGrid* op) : Engine_Cylinder(op)
+Engine_CylinderMultiGrid::Engine_CylinderMultiGrid(const Operator_CylinderMultiGrid* op) : Engine_sse(op)
 {
 	Op_CMG = op;
 
@@ -44,7 +44,7 @@ Engine_CylinderMultiGrid::Engine_CylinderMultiGrid(const Operator_CylinderMultiG
 	m_Eng_Ext_MG->SetEngine(this);
 
 	Engine* eng = op->GetInnerOperator()->CreateEngine();
-	m_InnerEngine = dynamic_cast<Engine_Multithread*>(eng);
+	m_InnerEngine = dynamic_cast<Engine_sse*>(eng);
 
 	Engine_Ext_CylinderMultiGrid* m_InnerEng_Ext_MG = new Engine_Ext_CylinderMultiGrid(NULL,false);
 	m_InnerEng_Ext_MG->SetBarrier(m_WaitOnBase, m_WaitOnChild, m_WaitOnSync);
@@ -89,7 +89,7 @@ Engine_CylinderMultiGrid::~Engine_CylinderMultiGrid()
 
 void Engine_CylinderMultiGrid::Init()
 {
-	Engine_Multithread::Init();
+	Engine_sse::Init();
 
 	m_Eng_exts.push_back(m_Eng_Ext_MG);
 
@@ -180,7 +180,7 @@ void Engine_CylinderMultiGrid::InterpolCurrChild2Base(unsigned int rPos)
 }
 
 /****************************************************************************************/
-Engine_CylinderMultiGrid_Thread::Engine_CylinderMultiGrid_Thread( Engine_Multithread* engine, boost::barrier *start, boost::barrier *stop, volatile unsigned int* numTS, bool isBase)
+Engine_CylinderMultiGrid_Thread::Engine_CylinderMultiGrid_Thread( Engine_sse* engine, boost::barrier *start, boost::barrier *stop, volatile unsigned int* numTS, bool isBase)
 {
 	m_startBarrier = start;
 	m_stopBarrier = stop;
@@ -196,7 +196,7 @@ void Engine_CylinderMultiGrid_Thread::operator()()
 	while (*m_numTS>0)	//m_numTS==0 request to terminate this thread...
 	{
 		if (m_isBase)
-			m_Eng->Engine_Multithread::IterateTS(*m_numTS);
+			m_Eng->Engine::IterateTS(*m_numTS);
 		else
 			m_Eng->IterateTS(*m_numTS);
 		m_stopBarrier->wait();		//sync all workers after iterations are performed

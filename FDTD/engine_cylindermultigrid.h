@@ -18,13 +18,15 @@
 #ifndef ENGINE_CYLINDERMULTIGRID_H
 #define ENGINE_CYLINDERMULTIGRID_H
 
-#include "engine_cylinder.h"
+#include "engine_sse.h"
+
+#include <boost/thread.hpp>
 
 class Operator_CylinderMultiGrid;
 class Engine_CylinderMultiGrid_Thread;
 class Engine_Ext_CylinderMultiGrid;
 
-class Engine_CylinderMultiGrid : public Engine_Cylinder
+class Engine_CylinderMultiGrid : public Engine_sse
 {
 	friend class Engine_Ext_CylinderMultiGrid;
 public:
@@ -45,7 +47,7 @@ protected:
 	Engine_CylinderMultiGrid(const Operator_CylinderMultiGrid* op);
 	const Operator_CylinderMultiGrid* Op_CMG;
 
-	Engine_Multithread* m_InnerEngine;
+	Engine_sse* m_InnerEngine;
 
 	volatile unsigned int m_Thread_NumTS;
 	boost::thread_group m_IteratorThread_Group;
@@ -66,11 +68,11 @@ protected:
 class Engine_CylinderMultiGrid_Thread
 {
 public:
-	Engine_CylinderMultiGrid_Thread( Engine_Multithread* engine, boost::barrier *start, boost::barrier *stop, volatile unsigned int* numTS, bool isBase);
+	Engine_CylinderMultiGrid_Thread( Engine_sse* engine, boost::barrier *start, boost::barrier *stop, volatile unsigned int* numTS, bool isBase);
 	void operator()();
 
 protected:
-	Engine_Multithread *m_Eng;
+	Engine_sse *m_Eng;
 	bool m_isBase;
 	boost::barrier *m_startBarrier;
 	boost::barrier *m_stopBarrier;

@@ -87,7 +87,7 @@ void Engine_Ext_CylinderMultiGrid::SyncVoltages()
 
 	unsigned int* numLines = m_Eng_MG->numLines;
 
-	Engine_Multithread* m_InnerEng = m_Eng_MG->m_InnerEngine;
+	Engine_sse* m_InnerEng = m_Eng_MG->m_InnerEngine;
 
 	//interpolate voltages from base engine to child engine...
 	unsigned int pos[3];

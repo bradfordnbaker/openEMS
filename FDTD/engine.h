@@ -23,12 +23,8 @@
 
 #include "tools/arraylib/array_nijk.h"
 
-namespace NS_Engine_Multithread
-{
-class thread; // evil hack to access numTS from multithreading context
-}
-
 class Engine_Extension;
+class Engine_ThreadPool;
 
 class Engine
 {
@@ -38,7 +34,8 @@ public:
 		BASIC, SSE, GPU, UNKNOWN
 	};
 
-	static Engine* New(const Operator* op);
+	//! A basic engine on \a numThreads threads, 0 for finding the best number while running (see NextInterval())
+	static Engine* New(const Operator* op, unsigned int numThreads = 0);
 	virtual ~Engine();
 
 	virtual void Init();
@@ -49,7 +46,11 @@ public:
 
 	virtual unsigned int GetNumberOfTimesteps() {return numTS;}
 
-	virtual void NextInterval(float curr_speed) {UNUSED(curr_speed);};
+	//! The speed of the last interval, for the thread count of the CPU engines
+	virtual void NextInterval(float curr_speed);
+
+	//! Number of threads of a CPU engine, 0 (default) for finding the best number while running; set before the first IterateTS()
+	void SetNumThreads(unsigned int numThreads) {m_numThreads = numThreads;}
 
 	//this access functions muss be overloaded by any new engine using a different storage model
 	inline virtual FDTD_FLOAT GetVolt(unsigned int n, unsigned int x, unsigned int y, unsigned int z) const
@@ -140,7 +141,11 @@ protected:
 	virtual void ClearExtensions();
 	std::vector<Engine_Extension*> m_Eng_exts;
 
-	friend class NS_Engine_Multithread::thread; // evil hack to access numTS from multithreading context
+	friend class Engine_ThreadPool;
+	friend class Engine_ThreadPool_Worker;
+
+	unsigned int m_numThreads;        //!< see SetNumThreads()
+	Engine_ThreadPool* m_ThreadPool;  //!< the worker threads of a CPU engine, created by the first IterateTS()
 };
 
 #endif // ENGINE_H

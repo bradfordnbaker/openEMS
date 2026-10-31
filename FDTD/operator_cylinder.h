@@ -20,7 +20,7 @@
 
 #define OPERATOR_CYLINDER_CLOSED_ALPHA_THRESHOLD 1e-6
 
-#include "operator_multithread.h"
+#include "operator_sse_compressed.h"
 
 class GPU_Backend;
 
@@ -31,7 +31,7 @@ class Operator_Ext_Cylinder;
 This class creates an operator for a cylindrical FDTD. No special engine is necessary,
 all special cases e.g. a closed alpha mesh or an included r=0 case is treated by an operator/engine extension \sa operator_ext_cylinder.
 */
-class Operator_Cylinder : public Operator_Multithread
+class Operator_Cylinder : public Operator_SSE_Compressed
 {
 	friend class Operator_CylinderMultiGrid;
 	friend class Operator_Ext_Cylinder;

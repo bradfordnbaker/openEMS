@@ -19,14 +19,14 @@
 #define ENGINE_SSE_H
 
 #include "engine.h"
-#include "operator_sse.h"
 
 #include "tools/arraylib/array_e.h"
 
 class Engine_sse : public Engine
 {
 public:
-	static Engine_sse* New(const Operator_sse* op);
+	//! The SSE engine on the compressed coefficients (Coeffs_SSE_Compressed) on \a numThreads threads, 0 for finding the best number while running
+	static Engine_sse* New(const Operator* op, unsigned int numThreads = 0);
 	virtual ~Engine_sse();
 
 	virtual void Init();
@@ -84,8 +84,9 @@ public:
 	}
 
 protected:
-	Engine_sse(const Operator_sse* op);
-	const Operator_sse* Op;
+	friend class Engine_CylinderMultiGrid;
+
+	Engine_sse(const Operator* op);
 
 	virtual void UpdateVoltages(unsigned int startX, unsigned int numX);
 	virtual void UpdateCurrents(unsigned int startX, unsigned int numX);

@@ -16,7 +16,7 @@
 */
 
 #include "engine.h"
-#include "engine_cylinder.h"
+#include "engine_sse.h"
 #include "engine_gpu.h"
 #include "Common/processfields.h"
 #include "operator_cylinder.h"
@@ -37,7 +37,7 @@ Operator_Cylinder* Operator_Cylinder::New(unsigned int numThreads)
 	return op;
 }
 
-Operator_Cylinder::Operator_Cylinder() : Operator_Multithread()
+Operator_Cylinder::Operator_Cylinder() : Operator_SSE_Compressed()
 {
 	m_MeshType = CYLINDRICAL;
 	m_Cyl_Ext = NULL;
@@ -66,8 +66,7 @@ Engine* Operator_Cylinder::CreateEngine()
 		m_Engine = Engine_GPU::New(this, TakeGPUBackend(), m_GPU_Parent);
 		return m_Engine;
 	}
-	//! create a special cylindrical-engine
-	m_Engine = Engine_Cylinder::New(this, m_numThreads);
+	m_Engine = Engine_sse::New(this, m_numThreads);
 	return m_Engine;
 }
 
@@ -75,7 +74,7 @@ void Operator_Cylinder::Init()
 {
 	CC_closedAlpha = false;
 	CC_R0_included = false;
-	Operator_Multithread::Init();
+	Operator_SSE_Compressed::Init();
 }
 
 double Operator_Cylinder::GetRawDiscDelta(int ny, const int pos) const
@@ -85,7 +84,7 @@ double Operator_Cylinder::GetRawDiscDelta(int ny, const int pos) const
 	if (CC_closedAlpha && ny==1 && (pos==(int)numLines[ny]-1))
 		return (discLines[1][2] - discLines[1][1]);
 
-	return Operator_Multithread::GetRawDiscDelta(ny,pos);
+	return Operator_SSE_Compressed::GetRawDiscDelta(ny,pos);
 }
 
 double Operator_Cylinder::GetMaterial(
@@ -101,7 +100,7 @@ double Operator_Cylinder::GetMaterial(
 		l_coords[1]-=2*PI;
 	if (CC_closedAlpha && (coords[1]<GetDiscLine(1,0,false)))
 		l_coords[1] += 2*PI;
-	return Operator_Multithread::GetMaterial(ny,l_coords,MatType,vPrims,markAsUsed);
+	return Operator_SSE_Compressed::GetMaterial(ny,l_coords,MatType,vPrims,markAsUsed);
 }
 
 int Operator_Cylinder::CalcECOperator( DebugFlags debugFlags )
@@ -109,7 +108,7 @@ int Operator_Cylinder::CalcECOperator( DebugFlags debugFlags )
 	// debugs only work with the native vector dumps
 	bool natDump = g_settings.NativeFieldDumps();
 	g_settings.SetNativeFieldDumps(true);
-	int rc = Operator_Multithread::CalcECOperator(debugFlags);
+	int rc = Operator_SSE_Compressed::CalcECOperator(debugFlags);
 	// reset original settings
 	g_settings.SetNativeFieldDumps(natDump);
 	return rc;
@@ -127,13 +126,13 @@ double Operator_Cylinder::CalcTimestep()
 inline unsigned int Operator_Cylinder::GetNumberOfLines(int ny, bool full) const
 {
 	if (full)
-		return Operator_Multithread::GetNumberOfLines(ny, full);
+		return Operator_SSE_Compressed::GetNumberOfLines(ny, full);
 
 	//this is necessary for a correct field processing... cylindrical engine has to reset this by adding +1
 	if (CC_closedAlpha && ny==1)
-		return Operator_Multithread::GetNumberOfLines(ny, true)-2;
+		return Operator_SSE_Compressed::GetNumberOfLines(ny, true)-2;
 
-	return Operator_Multithread::GetNumberOfLines(ny, full);
+	return Operator_SSE_Compressed::GetNumberOfLines(ny, full);
 }
 
 bool Operator_Cylinder::GetClosedMeshLines(int ny, unsigned int &first, unsigned int &last) const
@@ -155,7 +154,7 @@ std::string Operator_Cylinder::GetDirName(int ny) const
 
 bool Operator_Cylinder::GetYeeCoords(int ny, unsigned int pos[3], double* coords, bool dualMesh) const
 {
-	bool ret = Operator_Multithread::GetYeeCoords(ny,pos,coords,dualMesh);
+	bool ret = Operator_SSE_Compressed::GetYeeCoords(ny,pos,coords,dualMesh);
 
 	if (CC_closedAlpha && (coords[1]>=GetDiscLine(1,0,false)+2*PI))
 		coords[1]-=2*PI;
@@ -169,7 +168,7 @@ double Operator_Cylinder::GetNodeWidth(int ny, const unsigned int pos[3], bool d
 {
 	if ((ny<0) || (ny>2)) return 0.0;
 	if (pos[ny]>=numLines[ny]) return 0.0;
-	double width = Operator_Multithread::GetEdgeLength(ny,pos,!dualMesh);
+	double width = Operator_SSE_Compressed::GetEdgeLength(ny,pos,!dualMesh);
 	if (ny==1)
 		width *= GetDiscLine(0,pos[0],dualMesh);
 	return width;
@@ -193,7 +192,7 @@ double Operator_Cylinder::GetNodeArea(int ny, const unsigned int pos[3], bool du
 	if (pos[0]>=numLines[0]) return 0.0;
 	if (ny==2)
 	{
-		double da = Operator_Multithread::GetEdgeLength(1,pos,dualMesh)/gridDelta;
+		double da = Operator_SSE_Compressed::GetEdgeLength(1,pos,dualMesh)/gridDelta;
 		double r1,r2;
 
 		if (dualMesh)
@@ -213,7 +212,7 @@ double Operator_Cylinder::GetNodeArea(int ny, const unsigned int pos[3], bool du
 			return da/2* (pow(r2,2) - pow(r1,2));
 	}
 
-	return Operator_Multithread::GetNodeArea(ny,pos,dualMesh);
+	return Operator_SSE_Compressed::GetNodeArea(ny,pos,dualMesh);
 }
 
 double Operator_Cylinder::GetNodeArea(int ny, const int pos[3], bool dualMesh) const
@@ -230,7 +229,7 @@ double Operator_Cylinder::GetNodeArea(int ny, const int pos[3], bool dualMesh) c
 
 double Operator_Cylinder::GetEdgeLength(int ny, const unsigned int pos[3], bool dualMesh) const
 {
-	double length = Operator_Multithread::GetEdgeLength(ny,pos,dualMesh);
+	double length = Operator_SSE_Compressed::GetEdgeLength(ny,pos,dualMesh);
 	if (ny!=1)
 		return length;
 	return length * GetDiscLine(0,pos[0],dualMesh);
@@ -319,20 +318,20 @@ bool Operator_Cylinder::GetCellCenterMaterialAvgCoord(const int pos[3], double c
 {
 	if (!CC_closedAlpha || ((pos[1]>=0) && (pos[1]<(int)numLines[1]-2)))
 	{
-		return Operator_Multithread::GetCellCenterMaterialAvgCoord(pos, coord);
+		return Operator_SSE_Compressed::GetCellCenterMaterialAvgCoord(pos, coord);
 	}
 	if ((pos[0]<0) || (pos[2]<0))
 		return false;
 	int l_pos[3] = {pos[0], 0, pos[2]};
 	l_pos[1] = MapAlphaIndex2Range(pos[1]);
-	return Operator_Multithread::GetCellCenterMaterialAvgCoord(l_pos, coord);
+	return Operator_SSE_Compressed::GetCellCenterMaterialAvgCoord(l_pos, coord);
 }
 
 unsigned int Operator_Cylinder::SnapToMeshLine(int ny, double coord, bool &inside, bool dualMesh, bool fullMesh) const
 {
 	if (ny==1)
 		coord=FitToAlphaRange(coord);
-	return Operator_Multithread::SnapToMeshLine(ny, coord, inside, dualMesh, fullMesh);
+	return Operator_SSE_Compressed::SnapToMeshLine(ny, coord, inside, dualMesh, fullMesh);
 }
 
 int Operator_Cylinder::SnapBox2Mesh(const double* start, const double* stop, unsigned int* uiStart, unsigned int* uiStop, bool dualMesh, bool fullMesh, int SnapMethod, bool* bStartIn, bool* bStopIn) const
@@ -355,12 +354,12 @@ int Operator_Cylinder::SnapBox2Mesh(const double* start, const double* stop, uns
 
 	double l_start[3] = {start[0], a_start, start[2]};
 	double l_stop[3]  = {stop[0] , a_stop , stop[2] };
-	return Operator_Multithread::SnapBox2Mesh(l_start, l_stop, uiStart, uiStop, dualMesh, fullMesh, SnapMethod, bStartIn, bStopIn);
+	return Operator_SSE_Compressed::SnapBox2Mesh(l_start, l_stop, uiStart, uiStop, dualMesh, fullMesh, SnapMethod, bStartIn, bStopIn);
 }
 
 int Operator_Cylinder::SnapLine2Mesh(const double* start, const double* stop, unsigned int* uiStart, unsigned int* uiStop, bool dualMesh, bool fullMesh) const
 {
-	int ret = Operator_Multithread::SnapLine2Mesh(start, stop, uiStart, uiStop, dualMesh, fullMesh);
+	int ret = Operator_SSE_Compressed::SnapLine2Mesh(start, stop, uiStart, uiStop, dualMesh, fullMesh);
 
 	if ((stop[1]>start[1]) && (uiStop[1]<uiStart[1]) && (uiStop[1]==0))
 		uiStop[1] = GetNumberOfLines(1, fullMesh)-1-(int)CC_closedAlpha;
@@ -408,7 +407,7 @@ Grid_Path Operator_Cylinder::FindPath(double start[], double stop[])
 	{
 		l_start[1] = a_start;
 		l_stop[1] = a_stop;
-		return Operator_Multithread::FindPath(l_start, l_stop);
+		return Operator_SSE_Compressed::FindPath(l_start, l_stop);
 	}
 
 	// if a-stop fitted to disc range is now smaller than a-start, it must step over the a-bounds...
@@ -568,7 +567,7 @@ bool Operator_Cylinder::SetupCSXGrid(CSRectGrid* grid)
 		CC_R0_included = CC_closedAlpha;  //needed for correct ec-calculation, deactivate if closed cylinder is false... --> E_r = 0 anyways
 	}
 
-	if (Operator_Multithread::SetupCSXGrid(grid)==false)
+	if (Operator_SSE_Compressed::SetupCSXGrid(grid)==false)
 		return false;
 
 	if (CC_closedAlpha || CC_R0_included)
@@ -592,13 +591,13 @@ void Operator_Cylinder::ApplyMagneticBC(bool* dirs)
 	{
 		dirs[0]=0;  //no PMC in r_min directions...
 	}
-	Operator_Multithread::ApplyMagneticBC(dirs);
+	Operator_SSE_Compressed::ApplyMagneticBC(dirs);
 }
 
 void Operator_Cylinder::AddExtension(Operator_Extension* op_ext)
 {
 	if (op_ext->IsCylinderCoordsSave(CC_closedAlpha, CC_R0_included))
-		Operator_Multithread::AddExtension(op_ext);
+		Operator_SSE_Compressed::AddExtension(op_ext);
 	else
 	{
 		cerr << "Operator_Cylinder::AddExtension: Warning: Operator extension \"" << op_ext->GetExtensionName() << "\" is not compatible with cylinder-coords!! skipping...!" << endl;

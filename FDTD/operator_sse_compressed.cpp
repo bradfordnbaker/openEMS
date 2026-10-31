@@ -17,21 +17,21 @@
 
 
 #include "operator_sse_compressed.h"
-#include "engine_sse_compressed.h"
 #include "engine_sse.h"
 
 using std::cout;
 using std::endl;
 
-Operator_SSE_Compressed* Operator_SSE_Compressed::New()
+Operator_SSE_Compressed* Operator_SSE_Compressed::New(unsigned int numThreads)
 {
-	cout << "Create FDTD operator (compressed SSE)" << endl;
+	cout << "Create FDTD operator (compressed SSE + multi-threading)" << endl;
 	Operator_SSE_Compressed* op = new Operator_SSE_Compressed();
+	op->SetNumThreads(numThreads);
 	op->Init();
 	return op;
 }
 
-Operator_SSE_Compressed::Operator_SSE_Compressed() : Operator_sse()
+Operator_SSE_Compressed::Operator_SSE_Compressed() : Operator()
 {
 	SetCoeffs(new Coeffs_SSE_Compressed());
 }
@@ -42,10 +42,6 @@ Operator_SSE_Compressed::~Operator_SSE_Compressed()
 
 Engine* Operator_SSE_Compressed::CreateEngine()
 {
-	if (!GetCoeffsAs<Coeffs_SSE_Compressed>().IsCompressed())
-		//! create a default sse-engine
-		m_Engine = Engine_sse::New(this);
-	else
-		m_Engine = Engine_SSE_Compressed::New(this);
+	m_Engine = Engine_sse::New(this, m_numThreads);
 	return m_Engine;
 }

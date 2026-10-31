@@ -84,7 +84,7 @@ public:
 	ArrayLib::ArrayNIJK<FDTD_FLOAT>* ii; //!< calc new current from old voltage
 };
 
-//! Four z-lines interleaved per f4vector (Engine_sse)
+//! Four z-lines interleaved per f4vector, the layout Coeffs_SSE_Compressed is built in
 class Coeffs_SSE : public Operator_Coeffs
 {
 public:
@@ -111,7 +111,7 @@ public:
 	ArrayLib::ArrayENG<f4vector>* f4_ii; //!< calc new current from old voltage
 };
 
-//! Coeffs_SSE, of which Finalize() keeps only the distinct coefficient sets plus an index per node (Engine_SSE_Compressed)
+//! Coeffs_SSE, of which Finalize() keeps only the distinct coefficient sets plus an index per node (Engine_sse)
 class Coeffs_SSE_Compressed : public Coeffs_SSE
 {
 public:

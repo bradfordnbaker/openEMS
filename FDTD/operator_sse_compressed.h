@@ -18,13 +18,14 @@
 #ifndef OPERATOR_SSE_COMPRESSED_H
 #define OPERATOR_SSE_COMPRESSED_H
 
-#include "operator_sse.h"
+#include "operator.h"
 
-//! The operator for Engine_SSE_Compressed: its coefficients are a Coeffs_SSE_Compressed
-class Operator_SSE_Compressed : public Operator_sse
+//! The operator for Engine_sse: its coefficients are a Coeffs_SSE_Compressed
+class Operator_SSE_Compressed : public Operator
 {
 public:
-	static Operator_SSE_Compressed* New();
+	//! \a numThreads for the build and the engine, 0 for AvailableThreads() (see Operator::SetNumThreads() and Engine::SetNumThreads())
+	static Operator_SSE_Compressed* New(unsigned int numThreads = 0);
 	virtual ~Operator_SSE_Compressed();
 
 	virtual Engine* CreateEngine();

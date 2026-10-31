@@ -103,6 +103,11 @@ there are unreleased changes. It becomes the next release entry.
   computed ones. A few edges more can become metal, e.g. on sloped walls; a
   slit at x=0 in the split ground plane of the StripLine2MSL tutorial is
   closed.
+- Two CPU engines, both on all threads (`--numThreads`): `basic` and the
+  compressed SSE engine, the default. `--engine=sse` and `sse-compressed`
+  (`engine='sse'`...) are now other names of `multithreaded`; they and `basic`
+  ran on a single thread before. The results do not change. The operator is
+  built on all threads with every engine, which halves the setup of `basic`.
 
 ### Build
 
@@ -137,6 +142,10 @@ there are unreleased changes. It becomes the next release entry.
 
 - **Rebuild the Python bindings** together with openEMS: the layout of its
   array classes changed, the soname did not.
+- The `sse` and `sse-compressed` engines and `basic` use all threads now; for
+  a run on one thread pass `--numThreads=1` (`numThreads=1`). The
+  uncompressed SSE engine is gone; it was only ever used with an explicit
+  `--engine=sse`.
 
 ## 0.37.0 — 2026-10-09
 

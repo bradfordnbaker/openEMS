@@ -24,8 +24,8 @@
 #include "tools/denormal.h"
 #include "FDTD/operator_cylinder.h"
 #include "FDTD/operator_cylindermultigrid.h"
-#include "FDTD/engine_multithread.h"
-#include "FDTD/operator_multithread.h"
+#include "FDTD/operator_sse_compressed.h"
+#include "FDTD/engine_sse.h"
 #include "FDTD/operator_gpu.h"
 #include "FDTD/extensions/operator_ext_excitation.h"
 #include "FDTD/extensions/operator_ext_tfsf.h"
@@ -93,7 +93,7 @@ openEMS::openEMS()
 	m_DumpStats = false;
 	m_exactEndCriteria = false;
 
-	m_engine = EngineType_Multithreaded; //default engine type
+	m_engine = EngineType_SSE; //default engine type
 	m_engine_numThreads = 0;
 
 	m_Abort = false;
@@ -243,27 +243,18 @@ void openEMS::collectCommandLineArguments()
 					if (val == "fastest")
 					{
 						// default, don't show console output
-						m_engine = EngineType_Multithreaded;
+						m_engine = EngineType_SSE;
 					}
 					else if (val == "basic")
 					{
 						cout << "openEMS - enabled basic engine" << endl;
 						m_engine = EngineType_Basic;
 					}
-					else if (val == "sse")
+					else if ((val == "sse") || (val == "sse-compressed") || (val == "multithreaded"))
 					{
-						cout << "openEMS - enabled sse engine" << endl;
+						// one engine with three names, see the help text
+						cout << "openEMS - enabled the multithreaded SSE engine" << endl;
 						m_engine = EngineType_SSE;
-					}
-					else if (val == "sse-compressed")
-					{
-						cout << "openEMS - enabled compressed sse engine" << endl;
-						m_engine = EngineType_SSE_Compressed;
-					}
-					else if (val == "multithreaded")
-					{
-						cout << "openEMS - enabled multithreading" << endl;
-						m_engine = EngineType_Multithreaded;
 					}
 					else if (val == "gpu")
 					{
@@ -285,12 +276,10 @@ void openEMS::collectCommandLineArguments()
 			),
 		    "Choose engine type \n\n"
 			"  fastest: \tfastest available engine (default)\n"
-			"  basic: \tbasic FDTD engine\n"
-			"  sse: \tengine using SSE vector extensions\n"
-			"  sse-compressed: \tengine using compressed "
-			"operator + sse vector extensions\n"
+			"  basic: \tbasic FDTD engine, multithreaded\n"
 			"  multithreaded: \tengine using compressed "
-			"operator + sse vector extensions + multithreading\n"
+			"operator + SSE vector extensions + multithreading\n"
+			"  sse, sse-compressed: \tother names of multithreaded\n"
 			"  gpu: \tGPU engine on the best available backend\n"
 			"  gpu-reference: \tGPU engine with the reference backend on the CPU\n"
 		)
@@ -509,9 +498,8 @@ static Engine_Interface_FDTD* NewEngineInterface(Operator* op)
 {
 	if (dynamic_cast<Engine_GPU*>(op->GetEngine()))
 		return new Engine_Interface_GPU_FDTD(op);
-	Operator_sse* op_sse = dynamic_cast<Operator_sse*>(op);
-	if (op_sse)
-		return new Engine_Interface_SSE_FDTD(op_sse);
+	if (dynamic_cast<Engine_sse*>(op->GetEngine()))
+		return new Engine_Interface_SSE_FDTD(op);
 	return new Engine_Interface_FDTD(op);
 }
 
@@ -866,15 +854,7 @@ bool openEMS::SetupOperator()
 	}
 	else if (m_engine == EngineType_SSE)
 	{
-		FDTD_Op = Operator_sse::New();
-	}
-	else if (m_engine == EngineType_SSE_Compressed)
-	{
-		FDTD_Op = Operator_SSE_Compressed::New();
-	}
-	else if (m_engine == EngineType_Multithreaded)
-	{
-		FDTD_Op = Operator_Multithread::New(m_engine_numThreads);
+		FDTD_Op = Operator_SSE_Compressed::New(m_engine_numThreads);
 	}
 	else if (gpu)
 	{
@@ -883,6 +863,7 @@ bool openEMS::SetupOperator()
 	else
 	{
 		FDTD_Op = Operator::New();
+		FDTD_Op->SetNumThreads(m_engine_numThreads);
 	}
 	return true;
 }

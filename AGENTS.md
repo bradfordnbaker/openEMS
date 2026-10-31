@@ -32,11 +32,15 @@ The pipeline, and where each part lives:
    equivalent-circuit coefficients (`vv`, `vi`, `ii`, `iv`) for every Yee cell in
    `CalcECOperator()`, and holds the mesh (`discLines[]`). The coefficients live
    in an `Operator_Coeffs` (`FDTD/operator_coeffs.h`) in the layout the engine
-   reads: basic, SSE or compressed SSE. Subclasses specialise it:
-   `Operator_SSE`/`_SSE_Compressed` (choose the SIMD layout),
-   `Operator_Cylinder`/`_CylinderMultiGrid`, `Operator_Multithread`.
+   reads: basic or compressed SSE. Subclasses specialise it:
+   `Operator_SSE_Compressed` (chooses the SIMD layout),
+   `Operator_Cylinder`/`_CylinderMultiGrid`.
 3. **`Engine`** (`FDTD/engine.h`) time-steps those coefficients —
-   `UpdateVoltages`/`UpdateCurrents` over `volt_ptr`/`curr_ptr`.
+   `UpdateVoltages`/`UpdateCurrents` over `volt_ptr`/`curr_ptr`. The CPU
+   engines are `Engine` (basic) and `Engine_sse` (compressed SSE, the
+   default); both run on the worker threads of an `Engine_ThreadPool`, which
+   calls the thread-aware extension hooks with a `threadID`. `Engine_GPU` runs
+   on a device backend.
 4. **`Processing`** subclasses (`Common/`) sample the running simulation through
    an `Engine_Interface_Base` and write HDF5/VTK. The interface is what keeps
    probes and dumps independent of which engine is running.

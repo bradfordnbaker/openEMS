@@ -75,7 +75,7 @@ void Operator::SetCoeffs(Operator_Coeffs* coeffs)
 
 Engine* Operator::CreateEngine()
 {
-	m_Engine = Engine::New(this);
+	m_Engine = Engine::New(this, m_numThreads);
 	return m_Engine;
 }
 
