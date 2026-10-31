@@ -125,6 +125,15 @@ public:
 
 	EngineType GetType() const {return m_type;}
 
+	//! The engine of the sub-grid of a cylindrical multi-grid level, NULL without one; the threads of this engine step it right after this engine in every half step (Engine_ThreadPool)
+	virtual Engine* GetSubGridEngine() const {return NULL;}
+	//! Couple this grid and its sub-grid, once both did their voltage half step
+	virtual void SyncSubGridVoltages() {}
+	//! Couple this grid and its sub-grid, once both did their current half step
+	virtual void SyncSubGridCurrents() {}
+	//! Fill this grid from its sub-grid, at the end of IterateTS() (the sub-grid filled from its own first)
+	virtual void InterpolateFromSubGrid() {}
+
 protected:
 	EngineType m_type;
 

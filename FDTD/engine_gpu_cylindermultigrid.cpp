@@ -153,7 +153,7 @@ void Engine_GPU_CylinderMultiGrid::FinishBatch()
 	Engine_GPU::FinishBatch();
 }
 
-// see Engine_Ext_CylinderMultiGrid::SyncVoltages()
+// see Engine_CylinderMultiGrid::SyncSubGridVoltages()
 void Engine_GPU_CylinderMultiGrid::HostSyncVoltages()
 {
 	if (m_Interpol.split_pos<1)

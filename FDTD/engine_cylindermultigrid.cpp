@@ -17,7 +17,6 @@
 
 #include "engine_cylindermultigrid.h"
 #include "operator_cylindermultigrid.h"
-#include "extensions/engine_ext_cylindermultigrid.h"
 
 using std::cout;
 using std::endl;
@@ -34,95 +33,65 @@ Engine_CylinderMultiGrid* Engine_CylinderMultiGrid::New(const Operator_CylinderM
 Engine_CylinderMultiGrid::Engine_CylinderMultiGrid(const Operator_CylinderMultiGrid* op) : Engine_sse(op)
 {
 	Op_CMG = op;
-
-	m_WaitOnBase = new boost::barrier(2);
-	m_WaitOnChild = new boost::barrier(2);
-	m_WaitOnSync = new boost::barrier(2);
-
-	m_Eng_Ext_MG = new Engine_Ext_CylinderMultiGrid(NULL,true);
-	m_Eng_Ext_MG->SetBarrier(m_WaitOnBase, m_WaitOnChild, m_WaitOnSync);
-	m_Eng_Ext_MG->SetEngine(this);
-
-	Engine* eng = op->GetInnerOperator()->CreateEngine();
-	m_InnerEngine = dynamic_cast<Engine_sse*>(eng);
-
-	Engine_Ext_CylinderMultiGrid* m_InnerEng_Ext_MG = new Engine_Ext_CylinderMultiGrid(NULL,false);
-	m_InnerEng_Ext_MG->SetBarrier(m_WaitOnBase, m_WaitOnChild, m_WaitOnSync);
-
-	// if already has a base extension, switch places ... seems to be faster...
-	for (size_t n=0; n<m_InnerEngine->m_Eng_exts.size(); ++n)
-	{
-		Engine_Ext_CylinderMultiGrid* eng_mg = dynamic_cast<Engine_Ext_CylinderMultiGrid*>(m_InnerEngine->m_Eng_exts.at(n));
-		if (eng_mg)
-		{
-			m_InnerEngine->m_Eng_exts.at(n) = m_InnerEng_Ext_MG;
-			m_InnerEng_Ext_MG = eng_mg;
-			break;
-		}
-	}
-	m_InnerEngine->m_Eng_exts.push_back(m_InnerEng_Ext_MG);
+	m_InnerEngine = dynamic_cast<Engine_sse*>(op->GetInnerOperator()->CreateEngine());
+	if (m_InnerEngine==NULL)
+		throw std::runtime_error("Engine_CylinderMultiGrid: the sub-grid engine is not an SSE engine");
 }
 
 Engine_CylinderMultiGrid::~Engine_CylinderMultiGrid()
 {
-
-	m_Thread_NumTS = 0;
-	m_startBarrier->wait();
-
-	m_IteratorThread_Group.join_all();
-
+	// the threads of this engine step the sub-grid too
+	Reset();
 	delete m_InnerEngine;
 	m_InnerEngine = NULL;
-
-	delete m_WaitOnBase;
-	m_WaitOnBase = NULL;
-	delete m_WaitOnChild;
-	m_WaitOnChild = NULL;
-	delete m_WaitOnSync;
-	m_WaitOnSync = NULL;
-
-	delete m_startBarrier;
-	m_startBarrier = NULL;
-	delete m_stopBarrier;
-	m_stopBarrier = NULL;
 }
 
-void Engine_CylinderMultiGrid::Init()
+void Engine_CylinderMultiGrid::SyncSubGridVoltages()
 {
-	Engine_sse::Init();
+	Engine_sse* m_InnerEng = m_InnerEngine;
 
-	m_Eng_exts.push_back(m_Eng_Ext_MG);
+	//interpolate voltages from base engine to child engine...
+	unsigned int pos[3];
+	pos[0] = Op_CMG->GetSplitPos()-1;
+	unsigned int pos1_half = 0;
+	f4vector v_null;
+	v_null.f[0] = 0;
+	v_null.f[1] = 0;
+	v_null.f[2] = 0;
+	v_null.f[3] = 0;
+	for (pos[1]=0; pos[1]<numLines[1]-1; pos[1]+=2)
+	{
+		pos1_half = pos[1]/2;
+		for (pos[2]=0; pos[2]<numVectors; ++pos[2])
+		{
+			ArrayLib::ArrayNIJK<f4vector>& mgEng_f4_volt = *f4_volt_ptr;
+			ArrayLib::ArrayNIJK<f4vector>& innerEng_f4_volt = *m_InnerEng->f4_volt_ptr;
 
-	m_startBarrier = new boost::barrier(3); //both engines + organizer
-	m_stopBarrier = new boost::barrier(3); //both engines + organizer
+			//r - direczion
+			innerEng_f4_volt(0, pos[0], pos1_half, pos[2]).v = v_null.v;
 
-	boost::thread *t = NULL;
+			//z - direction
+			innerEng_f4_volt(2, pos[0], pos1_half, pos[2]).v = mgEng_f4_volt(2, pos[0], pos[1], pos[2]).v;
 
-	t = new boost::thread( Engine_CylinderMultiGrid_Thread(this,m_startBarrier,m_stopBarrier,&m_Thread_NumTS, true) );
-	m_IteratorThread_Group.add_thread( t );
-
-	t = new boost::thread( Engine_CylinderMultiGrid_Thread(m_InnerEngine,m_startBarrier,m_stopBarrier,&m_Thread_NumTS, false) );
-	m_IteratorThread_Group.add_thread( t );
-
-	m_InnerEngine->SortExtensionByPriority();
-	SortExtensionByPriority();
+			//alpha - direction
+			innerEng_f4_volt(1, pos[0], pos1_half, pos[2]).v  = mgEng_f4_volt(1, pos[0], pos[1]  , pos[2]).v;
+			innerEng_f4_volt(1, pos[0], pos1_half, pos[2]).v += mgEng_f4_volt(1, pos[0], pos[1]+1, pos[2]).v;
+		}
+	}
 }
 
-bool Engine_CylinderMultiGrid::IterateTS(unsigned int iterTS)
+void Engine_CylinderMultiGrid::SyncSubGridCurrents()
 {
-	m_Thread_NumTS = iterTS;
+	InterpolCurrChild2Base(Op_CMG->GetSplitPos()-2);
+}
 
-	m_startBarrier->wait(); //start base and child iterations
-
-	m_stopBarrier->wait();  //tell base and child to wait for another start event...
-
+void Engine_CylinderMultiGrid::InterpolateFromSubGrid()
+{
 	//interpolate child data to base mesh...
 	for (unsigned int n=0; n<Op_CMG->m_Split_Pos-1; ++n)
 		InterpolVoltChild2Base(n);
 	for (unsigned int n=0; n<Op_CMG->m_Split_Pos-2; ++n)
 		InterpolCurrChild2Base(n);
-
-	return true;
 }
 
 void Engine_CylinderMultiGrid::InterpolVoltChild2Base(unsigned int rPos)
@@ -176,30 +145,5 @@ void Engine_CylinderMultiGrid::InterpolCurrChild2Base(unsigned int rPos)
 			f4_curr(1, pos[0], pos[1], pos[2]).v  = Op_CMG->f4_interpol_i_2p[1][pos[1]].v * innerEngine_f4_curr(1, pos[0], Op_CMG->m_interpol_pos_i_2p[1][pos[1]], pos[2]).v
 													+ Op_CMG->f4_interpol_i_2pp[1][pos[1]].v * innerEngine_f4_curr(1, pos[0], Op_CMG->m_interpol_pos_i_2pp[1][pos[1]], pos[2]).v;
 		}
-	}
-}
-
-/****************************************************************************************/
-Engine_CylinderMultiGrid_Thread::Engine_CylinderMultiGrid_Thread( Engine_sse* engine, boost::barrier *start, boost::barrier *stop, volatile unsigned int* numTS, bool isBase)
-{
-	m_startBarrier = start;
-	m_stopBarrier = stop;
-	m_Eng=engine;
-	m_isBase=isBase;
-	m_numTS = numTS;
-}
-
-void Engine_CylinderMultiGrid_Thread::operator()()
-{
-	m_startBarrier->wait(); //wait for Base engine to start the iterations...
-
-	while (*m_numTS>0)	//m_numTS==0 request to terminate this thread...
-	{
-		if (m_isBase)
-			m_Eng->Engine::IterateTS(*m_numTS);
-		else
-			m_Eng->IterateTS(*m_numTS);
-		m_stopBarrier->wait();		//sync all workers after iterations are performed
-		m_startBarrier->wait();		//wait for Base engine to start the iterations again ...
 	}
 }

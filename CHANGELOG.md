@@ -111,6 +111,10 @@ there are unreleased changes. It becomes the next release entry.
 - A cylindrical mesh runs on the engine chosen with `--engine`; `basic` was
   ignored there and the multithreaded engine ran. A cylindrical multi-grid
   mesh needs `multithreaded` or `gpu`; `--engine=basic` is an error for it.
+- The grids of a cylindrical multi-grid mesh are stepped one after the other
+  by the same threads instead of by one thread pool each, with the same
+  results. With the default thread count the inner grids no longer stay on a
+  single thread: a 5.6 MCell model with two levels runs 12-25 % faster.
 - The GPU engine on a cylindrical mesh builds the plain host coefficients
   instead of the compressed SSE ones, and frees them once the device has
   them, as on a Cartesian mesh: with HIP the setup of an 8 MCell model takes

@@ -18,6 +18,8 @@
 #ifndef ENGINE_THREADPOOL_H
 #define ENGINE_THREADPOOL_H
 
+#include <vector>
+
 #include <boost/thread.hpp>
 
 class Engine;
@@ -28,6 +30,12 @@ class Engine;
   Engine::UpdateVoltages() and Engine::UpdateCurrents() and runs the
   thread-aware hooks of the engine extensions, with a barrier after the main
   updates and after each extension.
+
+  A half step (voltages, then currents) is done for the engine and then for its
+  chain of sub-grids (Engine::GetSubGridEngine(), cylindrical multi-grid), each
+  with its own x line ranges, followed by the coupling of the grids, innermost
+  first (Engine::SyncSubGridVoltages(), Engine::SyncSubGridCurrents()); after the
+  timesteps the grids are filled from their sub-grids (Engine::InterpolateFromSubGrid()).
   */
 class Engine_ThreadPool
 {
@@ -49,14 +57,23 @@ protected:
 	void ChangeNumThreads(unsigned int numThreads);
 	void StopThreads();
 
-	void DoPreVoltageUpdates(int threadID);
-	void DoPostVoltageUpdates(int threadID);
-	void Apply2Voltages(int threadID);
-	void DoPreCurrentUpdates(int threadID);
-	void DoPostCurrentUpdates(int threadID);
-	void Apply2Current(int threadID);
+	//! the half steps of grid \a g by thread \a threadID
+	void VoltageHalfStep(size_t g, unsigned int threadID);
+	void CurrentHalfStep(size_t g, unsigned int threadID);
+	//! the coupling of all grids after a half step, by the first thread
+	void SyncSubGrids(unsigned int threadID, bool voltages);
+
+	void DoPreVoltageUpdates(Engine* eng, int threadID);
+	void DoPostVoltageUpdates(Engine* eng, int threadID);
+	void Apply2Voltages(Engine* eng, int threadID);
+	void DoPreCurrentUpdates(Engine* eng, int threadID);
+	void DoPostCurrentUpdates(Engine* eng, int threadID);
+	void Apply2Current(Engine* eng, int threadID);
 
 	Engine* m_Eng;
+	std::vector<Engine*> m_Grids;   //!< the engine and its sub-grids, outermost first
+	//! per grid the x lines of each thread: voltages [start, stop], currents [start, stop_h]; fewer ranges than threads on a small grid
+	std::vector< std::vector<unsigned int> > m_Start, m_Stop, m_Stop_h;
 	boost::thread_group* m_thread_group;
 	boost::barrier* m_startBarrier;
 	boost::barrier* m_stopBarrier;

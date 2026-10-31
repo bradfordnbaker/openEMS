@@ -20,63 +20,36 @@
 
 #include "engine_sse.h"
 
-#include <boost/thread.hpp>
-
 class Operator_CylinderMultiGrid;
-class Engine_CylinderMultiGrid_Thread;
-class Engine_Ext_CylinderMultiGrid;
 
+//! The SSE engine of a cylindrical multi-grid level with its sub-grid
+/*!
+  The sub-grid engine is stepped by the threads of this engine (Engine_ThreadPool):
+  every half step this grid, then the sub-grid, then the coupling of the two
+  (SyncSubGridVoltages(), SyncSubGridCurrents()); after IterateTS() this grid is
+  filled inside the split radius from the sub-grid (InterpolateFromSubGrid()).
+  */
 class Engine_CylinderMultiGrid : public Engine_sse
 {
-	friend class Engine_Ext_CylinderMultiGrid;
 public:
-//	Engine_CylinderMultiGrid();
-
 	static Engine_CylinderMultiGrid* New(const Operator_CylinderMultiGrid* op, unsigned int numThreads = 0);
 	virtual ~Engine_CylinderMultiGrid();
 
+	virtual Engine* GetSubGridEngine() const {return m_InnerEngine;}
+	//! the voltages of the sub-grid on the split radius from this grid
+	virtual void SyncSubGridVoltages();
+	//! the currents of this grid next to the split radius from the sub-grid
+	virtual void SyncSubGridCurrents();
+	virtual void InterpolateFromSubGrid();
+
 	virtual void InterpolVoltChild2Base(unsigned int rPos);
 	virtual void InterpolCurrChild2Base(unsigned int rPos);
-
-	virtual void Init();
-
-	//! Iterate \a iterTS number of timesteps
-	virtual bool IterateTS(unsigned int iterTS);
 
 protected:
 	Engine_CylinderMultiGrid(const Operator_CylinderMultiGrid* op);
 	const Operator_CylinderMultiGrid* Op_CMG;
 
 	Engine_sse* m_InnerEngine;
-
-	volatile unsigned int m_Thread_NumTS;
-	boost::thread_group m_IteratorThread_Group;
-	boost::barrier *m_startBarrier;
-	boost::barrier *m_stopBarrier;
-	Engine_CylinderMultiGrid_Thread* m_IteratorThread;
-	Engine_CylinderMultiGrid_Thread* m_InnerIteratorThread;
-
-	//extension barrier
-	boost::barrier *m_WaitOnBase;
-	boost::barrier *m_WaitOnChild;
-	boost::barrier *m_WaitOnSync;
-
-	Engine_Ext_CylinderMultiGrid* m_Eng_Ext_MG;
-};
-
-
-class Engine_CylinderMultiGrid_Thread
-{
-public:
-	Engine_CylinderMultiGrid_Thread( Engine_sse* engine, boost::barrier *start, boost::barrier *stop, volatile unsigned int* numTS, bool isBase);
-	void operator()();
-
-protected:
-	Engine_sse *m_Eng;
-	bool m_isBase;
-	boost::barrier *m_startBarrier;
-	boost::barrier *m_stopBarrier;
-	volatile unsigned int *m_numTS;
 };
 
 #endif // ENGINE_CYLINDERMULTIGRID_H
