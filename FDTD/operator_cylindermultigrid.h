@@ -43,6 +43,8 @@ public:
 
 	virtual double GetNumberCells() const;
 
+	//! The engine of every grid level: the multithreaded SSE engine or the GPU (not the basic engine, see Engine_CylinderMultiGrid)
+	virtual void SetEngineKind(EngineKind kind);
 	virtual Engine* CreateEngine();
 
 	virtual bool SetGeometryCSX(ContinuousStructure* geo);

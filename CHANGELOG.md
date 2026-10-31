@@ -108,6 +108,13 @@ there are unreleased changes. It becomes the next release entry.
   (`engine='sse'`...) are now other names of `multithreaded`; they and `basic`
   ran on a single thread before. The results do not change. The operator is
   built on all threads with every engine, which halves the setup of `basic`.
+- A cylindrical mesh runs on the engine chosen with `--engine`; `basic` was
+  ignored there and the multithreaded engine ran. A cylindrical multi-grid
+  mesh needs `multithreaded` or `gpu`; `--engine=basic` is an error for it.
+- The GPU engine needs less host memory in the setup: the operator keeps its
+  update coefficients compressed until the backend has copied them, and
+  frees them afterwards also on a cylindrical mesh. With the reference
+  backend the peak of an 8 MCell Cartesian model drops by about 30 %.
 
 ### Build
 

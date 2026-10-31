@@ -3,7 +3,8 @@
  GPU engine test — comparison with the basic engine
 
  Each case runs with engine='basic', engine='gpu-reference' and engine='gpu'
- and compares all probe files and all HDF5 field dumps.
+ and compares all probe files and all HDF5 field dumps. A multi-grid mesh does
+ not run on the basic engine, there the CPU reference is engine='multithreaded'.
 
  The reference backend performs the main FDTD updates on the CPU on its own
  copy of the fields, exactly like the basic engine, so its results must be
@@ -14,8 +15,7 @@
  Together the cases use the excitation, UPML, Mur ABC, Lorentz and Debye material,
  lumped RLC, conducting sheet, TF/SF, local absorber, steady-state and
  cylinder extensions, and cylindrical meshes with one and two multi-grid
- levels. For cylindrical meshes the engine choice 'basic' has no effect, the
- CPU reference is the cylindrical (multithreaded) engine.
+ levels.
 
  Pass criteria (per case)
    the requested backend was created (not a silent fallback)
@@ -33,6 +33,8 @@
    device backend, cases coeff_index32 and coeff_full: the update coefficients as sets with
      a 32 bit index, and as full arrays (FULL_DEVICE_BACKENDS)
    reference backend: all probe data and field dumps bit-identical
+   cylindrical cases: engine='multithreaded' bit-identical to engine='basic'
+   case multigrid: engine='basic' fails the setup
    device backend: max. deviation < 1e-4 of the peak value, per probe file and per field dump
      (skipped without a GPU device)
 
@@ -355,7 +357,7 @@ def case_absorbers():
 
 
 def cylinder_mesh(FDTD, alpha, r0, r1, z_pad=0):
-    """ cylindrical mesh, the CPU reference is the cylindrical engine (engine='basic' has no effect);
+    """ cylindrical mesh;
         z_pad extends z beyond 0..30 on both sides, e.g. to make room for a PML """
     CSX = ContinuousStructure(CoordSystem=1)
     FDTD.SetCSX(CSX)
@@ -636,10 +638,13 @@ DEVICE_RTOL = 1e-4
 FULL_DEVICE_BACKENDS = ('HIP', 'Metal')
 # device backends that accumulate the frequency domain dumps
 DEVICE_DFT_BACKENDS = ('HIP',)
-engines = ('basic', 'gpu-reference', 'gpu')
-
 for name, case, on_device in cases:
     print(f'Testing case: {name}')
+    # the CPU reference: a multi-grid mesh does not run on the basic engine
+    cpu = 'multithreaded' if name.startswith('multigrid') else 'basic'
+    engines = (cpu, 'gpu-reference', 'gpu')
+    if name.startswith('cylinder'):
+        engines += ('multithreaded',)   # the basic engine on a cylindrical mesh against the default one
     paths = {engine: os.path.join(tempfile.gettempdir(), f'GPU_Engine_{name}_{engine}') for engine in engines}
     os.environ.update(CASE_ENV.get(name, {}))
     try:
@@ -648,18 +653,27 @@ for name, case, on_device in cases:
         for var in CASE_ENV.get(name, {}):
             del os.environ[var]
 
-    assert 'Create FDTD engine (GPU' not in logs['basic'], \
-        f'FAIL [{name}]: engine=basic created the GPU engine'
+    assert 'Create FDTD engine (GPU' not in logs[cpu], \
+        f'FAIL [{name}]: engine={cpu} created the GPU engine'
     assert 'Create FDTD engine (GPU, backend: reference' in logs['gpu-reference'], \
         f'FAIL [{name}]: engine=gpu-reference did not create the GPU engine with the reference backend'
 
-    diff, n_probes, n_dumps, _ = compare_outputs(paths['basic'], paths['gpu-reference'])
+    diff, n_probes, n_dumps, _ = compare_outputs(paths[cpu], paths['gpu-reference'])
     print(f'  reference backend: compared {n_probes} probe files and {n_dumps} field dumps')
-    assert not diff, f'FAIL [{name}]: reference backend differs from the basic engine in: {", ".join(n for n, _ in diff)}'
+    assert not diff, f'FAIL [{name}]: reference backend differs from the {cpu} engine in: {", ".join(n for n, _ in diff)}'
+
+    if 'multithreaded' in engines and cpu=='basic':
+        diff, _, _, _ = compare_outputs(paths['basic'], paths['multithreaded'])
+        assert not diff, f'FAIL [{name}]: the multithreaded engine differs from the basic engine in: {", ".join(n for n, _ in diff)}'
+
+    if name=='multigrid':
+        FDTD, CSX = case()
+        rc = FDTD.Run(os.path.join(tempfile.gettempdir(), f'GPU_Engine_{name}_basic'), cleanup=True, engine='basic')
+        assert rc, f'FAIL [{name}]: engine=basic ran a multi-grid mesh'
 
     if name=='cylinder_closed':
         # the H and the B field are interpolated alike, also on the alpha seam of the mesh
-        with h5py.File(os.path.join(paths['basic'], 'Ht_node.h5'), 'r') as H, h5py.File(os.path.join(paths['basic'], 'Bt_node.h5'), 'r') as B:
+        with h5py.File(os.path.join(paths[cpu], 'Ht_node.h5'), 'r') as H, h5py.File(os.path.join(paths[cpu], 'Bt_node.h5'), 'r') as B:
             ts = sorted(H['FieldData/TD'].keys())[-1]
             dev = deviation(H['FieldData/TD'][ts][()], B['FieldData/TD'][ts][()]/(4e-7*np.pi))
         assert dev<1e-6, f'FAIL [{name}]: the B field dump is not mue0 times the H field dump ({dev:.1e} of the peak)'
@@ -689,7 +703,7 @@ for name, case, on_device in cases:
             expected, unexpected = UPML_MODES[name]
             assert (expected is None or expected in logs['gpu']) and (unexpected is None or unexpected not in logs['gpu']), \
                 f'FAIL [{name}]: the HIP backend did not take the intended UPML update'
-        diff, _, _, worst = compare_outputs(paths['basic'], paths['gpu'], rtol=DEVICE_RTOL)
+        diff, _, _, worst = compare_outputs(paths[cpu], paths['gpu'], rtol=DEVICE_RTOL)
         print(f'  {backend} backend: max. deviation {worst:.1e} of the peak value')
         assert not diff, f'FAIL [{name}]: {backend} backend deviates from the basic engine: ' + \
             ', '.join(f'{n} ({d:.1e})' for n, d in diff)

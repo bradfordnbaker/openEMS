@@ -190,9 +190,6 @@ CASES = {
     'cylindrical':   cylindrical,
 }
 
-# the basic engine has no effect on a cylindrical mesh, which runs multithreaded
-CARTESIAN_ONLY_ENGINES = ('basic',)
-
 
 def write_case(name, size, xml_file):
     """ Write case `name` at `size` to `xml_file` """

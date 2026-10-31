@@ -24,9 +24,7 @@
 #include "tools/denormal.h"
 #include "FDTD/operator_cylinder.h"
 #include "FDTD/operator_cylindermultigrid.h"
-#include "FDTD/operator_sse_compressed.h"
 #include "FDTD/engine_sse.h"
-#include "FDTD/operator_gpu.h"
 #include "FDTD/extensions/operator_ext_excitation.h"
 #include "FDTD/extensions/operator_ext_tfsf.h"
 #include "FDTD/extensions/operator_ext_mur_abc.h"
@@ -841,30 +839,36 @@ bool openEMS::SetupOperator()
 		}
 	}
 
+	Operator::EngineKind kind = Operator::ENGINE_SSE;
+	if (gpu)
+		kind = Operator::ENGINE_GPU;
+	else if (m_engine == EngineType_Basic)
+		kind = Operator::ENGINE_BASIC;
+
 	if (CylinderCoords)
 	{
+		if ((m_CC_MultiGrid.size()>0) && (kind == Operator::ENGINE_BASIC))
+		{
+			cerr << "openEMS::SetupFDTD: Error: a cylindrical multi-grid mesh needs --engine=multithreaded or gpu, not basic" << endl;
+			return false;
+		}
 		Operator_Cylinder* op_cyl = NULL;
 		if (m_CC_MultiGrid.size()>0)
 			op_cyl = Operator_CylinderMultiGrid::New(m_CC_MultiGrid, m_engine_numThreads);
 		if (op_cyl==NULL)
 			op_cyl = Operator_Cylinder::New(m_engine_numThreads);
-		if (gpu)
-			op_cyl->SetGPUBackend(gpu_backend);
 		FDTD_Op = op_cyl;
-	}
-	else if (m_engine == EngineType_SSE)
-	{
-		FDTD_Op = Operator_SSE_Compressed::New(m_engine_numThreads);
-	}
-	else if (gpu)
-	{
-		FDTD_Op = Operator_GPU::New(gpu_backend);
 	}
 	else
 	{
+		const char* names[] = {"basic + multi-threading", "compressed SSE + multi-threading", "GPU"};
+		cout << "Create FDTD operator (" << names[kind] << ")" << endl;
 		FDTD_Op = Operator::New();
 		FDTD_Op->SetNumThreads(m_engine_numThreads);
 	}
+	FDTD_Op->SetEngineKind(kind);
+	if (gpu)
+		FDTD_Op->SetGPUBackend(gpu_backend);
 	return true;
 }
 

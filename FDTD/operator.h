@@ -31,6 +31,7 @@
 class Operator_Extension;
 class Operator_Ext_Excitation;
 class Engine;
+class GPU_Backend;
 class TiXmlElement;
 
 //! Basic FDTD-operator
@@ -55,6 +56,15 @@ public:
 	//! Create a new operator
 	static Operator* New();
 	virtual ~Operator();
+
+	//! The engine the operator creates (CreateEngine()) and builds its coefficients for
+	enum EngineKind {ENGINE_BASIC, ENGINE_SSE, ENGINE_GPU};
+	//! Choose the engine, and with it the layout of the coefficients (Coeffs_Basic for the basic engine, else Coeffs_SSE_Compressed); before the operator is built
+	virtual void SetEngineKind(EngineKind kind);
+	EngineKind GetEngineKind() const {return m_EngineKind;}
+	//! The backend of a GPU engine (see GPU_Backend::New), which the operator takes over and hands on to its engine
+	//! A multi-grid sub-grid passes the backend of its parent grid as \a parent instead (see GPU_Backend::NewSubGridBackend()).
+	void SetGPUBackend(GPU_Backend* backend, GPU_Backend* parent=NULL);
 
 	virtual Engine* CreateEngine();
 	virtual Engine* GetEngine() const {return m_Engine;}
@@ -223,6 +233,12 @@ protected:
 	Operator();
 
 	unsigned int m_numThreads; //!< see SetNumThreads()
+
+	EngineKind m_EngineKind;     //!< see SetEngineKind()
+	GPU_Backend* m_GPU_Backend;  //!< until CreateEngine()
+	GPU_Backend* m_GPU_Parent;
+	//! hands the backend on to the engine
+	GPU_Backend* TakeGPUBackend() {GPU_Backend* b = m_GPU_Backend; m_GPU_Backend = NULL; return b;}
 	//! The number of threads the operator build uses, from m_numThreads and AvailableThreads().
 	unsigned int GetBuildThreads() const;
 

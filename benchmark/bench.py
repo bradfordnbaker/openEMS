@@ -336,12 +336,8 @@ def cmd_run(args):
     for name in names:
         for size in sizes:
             for engine in engines:
-                if name == 'cylindrical' and engine in cases.CARTESIAN_ONLY_ENGINES:
-                    continue    # same as multithreaded on a cylindrical mesh
                 for nt in threads:
                     todo.append((name, size, engine, nt))
-    if any(e in cases.CARTESIAN_ONLY_ENGINES for e in engines) and 'cylindrical' in names:
-        print('note: cylindrical runs multithreaded only, basic is the same there')
     if 'gpu' in engines:
         for label, info in binaries.items():
             if not info['gpu_devices']:

@@ -22,6 +22,9 @@
 #include "operator.h"
 #include "tools/useful.h"
 #include "engine.h"
+#include "engine_sse.h"
+#include "engine_gpu.h"
+#include "gpu_backend.h"
 #include "extensions/operator_extension.h"
 #include "extensions/operator_ext_excitation.h"
 #include "Common/processfields.h"
@@ -42,7 +45,6 @@ using std::flush;
 
 Operator* Operator::New()
 {
-	cout << "Create FDTD operator" << endl;
 	Operator* op = new Operator();
 	op->Init();
 	return op;
@@ -55,6 +57,9 @@ Operator::Operator() : Operator_Base()
 	m_TimeStepVar = 3;
 	m_numThreads = 0;
 	m_Coeffs = new Coeffs_Basic();
+	m_EngineKind = ENGINE_BASIC;
+	m_GPU_Backend = NULL;
+	m_GPU_Parent = NULL;
 }
 
 Operator::~Operator()
@@ -65,6 +70,28 @@ Operator::~Operator()
 
 	Delete();
 	delete m_Coeffs;
+	delete m_GPU_Backend;
+}
+
+void Operator::SetEngineKind(EngineKind kind)
+{
+	if (kind==m_EngineKind)
+		return;
+	m_EngineKind = kind;
+	// the GPU backends read the coefficients through GetVV() and friends, in any layout:
+	// the compressed one is the smallest on the host when they make their copy
+	if (kind==ENGINE_BASIC)
+		SetCoeffs(new Coeffs_Basic());
+	else
+		SetCoeffs(new Coeffs_SSE_Compressed());
+}
+
+void Operator::SetGPUBackend(GPU_Backend* backend, GPU_Backend* parent)
+{
+	if (backend!=m_GPU_Backend)
+		delete m_GPU_Backend;
+	m_GPU_Backend = backend;
+	m_GPU_Parent = parent;
 }
 
 void Operator::SetCoeffs(Operator_Coeffs* coeffs)
@@ -75,7 +102,20 @@ void Operator::SetCoeffs(Operator_Coeffs* coeffs)
 
 Engine* Operator::CreateEngine()
 {
-	m_Engine = Engine::New(this, m_numThreads);
+	switch (m_EngineKind)
+	{
+	case ENGINE_GPU:
+		m_Engine = Engine_GPU::New(this, TakeGPUBackend(), m_GPU_Parent);
+		// The device holds the coefficients now: free the host ones (48 bytes per node),
+		// as the compressed storage frees its full arrays. GetVV() and friends are invalid after this.
+		m_Coeffs->Free();
+		break;
+	case ENGINE_SSE:
+		m_Engine = Engine_sse::New(this, m_numThreads);
+		break;
+	default:
+		m_Engine = Engine::New(this, m_numThreads);
+	}
 	return m_Engine;
 }
 

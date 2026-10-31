@@ -36,6 +36,8 @@ Operator_CylinderMultiGrid::Operator_CylinderMultiGrid(
 	m_Split_Rad = m_Split_Radii.back();
 	m_Split_Radii.pop_back();
 	m_MultiGridLevel = level;
+	// not the basic engine; Operator:: as the inner operator is created by Init()
+	Operator::SetEngineKind(ENGINE_SSE);
 }
 
 Operator_CylinderMultiGrid::~Operator_CylinderMultiGrid()
@@ -62,10 +64,22 @@ Operator_CylinderMultiGrid* Operator_CylinderMultiGrid::New(
 	return op;
 }
 
+void Operator_CylinderMultiGrid::SetEngineKind(EngineKind kind)
+{
+	if (kind==ENGINE_BASIC)
+		throw std::runtime_error("a cylindrical multi-grid mesh needs the multithreaded or the GPU engine, not the basic engine");
+	Operator_Cylinder::SetEngineKind(kind);
+	m_InnerOp->SetEngineKind(kind);
+}
+
 Engine* Operator_CylinderMultiGrid::CreateEngine()
 {
-	if (UseGPU())
+	if (m_EngineKind==ENGINE_GPU)
+	{
 		m_Engine = Engine_GPU_CylinderMultiGrid::New(this, TakeGPUBackend(), m_GPU_Parent);
+		// the device holds the coefficients now, see Operator::CreateEngine()
+		m_Coeffs->Free();
+	}
 	else
 		m_Engine = Engine_CylinderMultiGrid::New(this, m_numThreads);
 	return m_Engine;
@@ -143,6 +157,8 @@ void Operator_CylinderMultiGrid::Init()
 		m_InnerOp = Operator_Cylinder::New(m_numThreads);
 	else
 		m_InnerOp = Operator_CylinderMultiGrid::New(m_Split_Radii,m_numThreads, m_MultiGridLevel+1);
+	if (m_EngineKind!=ENGINE_BASIC)
+		m_InnerOp->SetEngineKind(m_EngineKind);
 
 	for (int n=0;n<2;++n)
 	{
