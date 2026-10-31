@@ -101,7 +101,7 @@ SubGrid_Coupling_SSE::SubGrid_Coupling_SSE(Engine_sse* base, Engine_sse* sub, co
 
 void SubGrid_Coupling_SSE::SyncVoltages()
 {
-	
+
 	//interpolate voltages from base engine to child engine...
 	unsigned int pos[3];
 	pos[0] = m_Op->GetSplitPos()-1;
