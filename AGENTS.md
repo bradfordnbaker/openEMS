@@ -30,8 +30,10 @@ The pipeline, and where each part lives:
    `Operator`, one `Engine`, one `ProcessingArray`, and the engine-type choice.
 2. **`Operator`** (`FDTD/operator.h`, `Common/operator_base.h`) pre-computes the
    equivalent-circuit coefficients (`vv`, `vi`, `ii`, `iv`) for every Yee cell in
-   `CalcECOperator()`, and holds the mesh (`discLines[]`). Subclasses specialise
-   it: `Operator_SSE`/`_SSE_Compressed` (SIMD layout),
+   `CalcECOperator()`, and holds the mesh (`discLines[]`). The coefficients live
+   in an `Operator_Coeffs` (`FDTD/operator_coeffs.h`) in the layout the engine
+   reads: basic, SSE or compressed SSE. Subclasses specialise it:
+   `Operator_SSE`/`_SSE_Compressed` (choose the SIMD layout),
    `Operator_Cylinder`/`_CylinderMultiGrid`, `Operator_Multithread`.
 3. **`Engine`** (`FDTD/engine.h`) time-steps those coefficients —
    `UpdateVoltages`/`UpdateCurrents` over `volt_ptr`/`curr_ptr`.

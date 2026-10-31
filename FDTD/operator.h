@@ -24,6 +24,9 @@
 #include "Common/operator_base.h"
 
 #include "tools/arraylib/array_nijk.h"
+#include "operator_coeffs.h"
+
+#include <stdexcept>
 
 class Operator_Extension;
 class Operator_Ext_Excitation;
@@ -60,70 +63,32 @@ public:
 
 	virtual int CalcECOperator( DebugFlags debugFlags = None );
 
-	// the next four functions need to be reimplemented in a derived class
-	inline virtual FDTD_FLOAT GetVV(unsigned int n, unsigned int x, unsigned int y, unsigned int z) const
+	//! The update coefficients, see Operator_Coeffs
+	const Operator_Coeffs* GetCoeffs() const {return m_Coeffs;}
+	//! The update coefficients in the layout \a T an engine reads directly; throws if the operator stores another layout
+	template <class T> const T& GetCoeffsAs() const
 	{
-		ArrayLib::ArrayNIJK<FDTD_FLOAT>& vv = *vv_ptr;
-		return vv(n, x, y, z);
+		const T* coeffs = dynamic_cast<const T*>(m_Coeffs);
+		if (coeffs==NULL)
+			throw std::runtime_error("Operator::GetCoeffsAs: the operator stores its coefficients in another layout");
+		return *coeffs;
 	}
 
-	inline virtual FDTD_FLOAT GetVI(unsigned int n, unsigned int x, unsigned int y, unsigned int z) const
-	{
-		ArrayLib::ArrayNIJK<FDTD_FLOAT>& vi = *vi_ptr;
-		return vi(n, x, y, z);
-	}
-
-	inline virtual FDTD_FLOAT GetII(unsigned int n, unsigned int x, unsigned int y, unsigned int z) const
-	{
-		ArrayLib::ArrayNIJK<FDTD_FLOAT>& ii = *ii_ptr;
-		return ii(n, x, y, z);
-	}
-	inline virtual FDTD_FLOAT GetIV(unsigned int n, unsigned int x, unsigned int y, unsigned int z) const
-	{
-		ArrayLib::ArrayNIJK<FDTD_FLOAT>& iv = *iv_ptr;
-		return iv(n, x, y, z);
-	}
+	inline FDTD_FLOAT GetVV(unsigned int n, unsigned int x, unsigned int y, unsigned int z) const {return m_Coeffs->GetVV(n, x, y, z);}
+	inline FDTD_FLOAT GetVI(unsigned int n, unsigned int x, unsigned int y, unsigned int z) const {return m_Coeffs->GetVI(n, x, y, z);}
+	inline FDTD_FLOAT GetII(unsigned int n, unsigned int x, unsigned int y, unsigned int z) const {return m_Coeffs->GetII(n, x, y, z);}
+	inline FDTD_FLOAT GetIV(unsigned int n, unsigned int x, unsigned int y, unsigned int z) const {return m_Coeffs->GetIV(n, x, y, z);}
 
 	// convenient access functions
-	inline virtual FDTD_FLOAT GetVV( unsigned int n, unsigned int pos[3] ) const
-	{
-		return GetVV(n, pos[0], pos[1], pos[2]);
-	}
+	inline FDTD_FLOAT GetVV(unsigned int n, unsigned int pos[3]) const {return GetVV(n, pos[0], pos[1], pos[2]);}
+	inline FDTD_FLOAT GetVI(unsigned int n, unsigned int pos[3]) const {return GetVI(n, pos[0], pos[1], pos[2]);}
+	inline FDTD_FLOAT GetII(unsigned int n, unsigned int pos[3]) const {return GetII(n, pos[0], pos[1], pos[2]);}
+	inline FDTD_FLOAT GetIV(unsigned int n, unsigned int pos[3]) const {return GetIV(n, pos[0], pos[1], pos[2]);}
 
-	inline virtual FDTD_FLOAT GetVI( unsigned int n, unsigned int pos[3] ) const
-	{
-		return GetVI(n, pos[0], pos[1], pos[2]);
-	}
-	inline virtual FDTD_FLOAT GetII( unsigned int n, unsigned int pos[3] ) const
-	{
-		return GetII(n, pos[0], pos[1], pos[2]);
-	}
-	inline virtual FDTD_FLOAT GetIV( unsigned int n, unsigned int pos[3] ) const
-	{
-		return GetIV(n, pos[0], pos[1], pos[2]);
-	}
-
-	// the next four functions need to be reimplemented in a derived class
-	inline virtual void SetVV(unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value)
-	{
-		ArrayLib::ArrayNIJK<FDTD_FLOAT>& vv = *vv_ptr;
-		vv(n, x, y, z) = value;
-	}
-	inline virtual void SetVI(unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value)
-	{
-		ArrayLib::ArrayNIJK<FDTD_FLOAT>& vi = *vi_ptr;
-		vi(n, x, y, z) = value;
-	}
-	inline virtual void SetII(unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value)
-	{
-		ArrayLib::ArrayNIJK<FDTD_FLOAT>& ii = *ii_ptr;
-		ii(n, x, y, z) = value;
-	}
-	inline virtual void SetIV(unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value)
-	{
-		ArrayLib::ArrayNIJK<FDTD_FLOAT>& iv = *iv_ptr;
-		iv(n, x, y, z) = value;
-	}
+	inline void SetVV(unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value) {m_Coeffs->SetVV(n, x, y, z, value);}
+	inline void SetVI(unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value) {m_Coeffs->SetVI(n, x, y, z, value);}
+	inline void SetII(unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value) {m_Coeffs->SetII(n, x, y, z, value);}
+	inline void SetIV(unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value) {m_Coeffs->SetIV(n, x, y, z, value);}
 
 	virtual void ApplyElectricBC(bool* dirs); //applied by default to all boundaries
 	virtual void ApplyMagneticBC(bool* dirs);
@@ -377,13 +342,9 @@ protected:
 	Excitation* m_Exc; // excitation time signal class
 //	Operator_Ext_Excitation* m_Op_Ext_Exc; // excitation extension
 
-	// engine/post-proc needs access
-public:
-	//EC operator
-	ArrayLib::ArrayNIJK<FDTD_FLOAT>* vv_ptr; //calc new voltage from old voltage
-	ArrayLib::ArrayNIJK<FDTD_FLOAT>* vi_ptr; //calc new voltage from old current
-	ArrayLib::ArrayNIJK<FDTD_FLOAT>* ii_ptr; //calc new current from old current
-	ArrayLib::ArrayNIJK<FDTD_FLOAT>* iv_ptr; //calc new current from old voltage
+	Operator_Coeffs* m_Coeffs; //!< owned; Coeffs_Basic unless a derived class sets another one
+	//! Replace the coefficient storage (before the operator is built), taking over \a coeffs
+	void SetCoeffs(Operator_Coeffs* coeffs);
 };
 
 inline Operator::DebugFlags operator|( Operator::DebugFlags a, Operator::DebugFlags b ) { return static_cast<Operator::DebugFlags>(static_cast<int>(a) | static_cast<int>(b)); }

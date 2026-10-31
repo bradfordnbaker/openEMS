@@ -76,8 +76,9 @@ void Engine_sse::UpdateVoltages(unsigned int startX, unsigned int numX)
 {
 	ArrayLib::ArrayENG<f4vector>& f4_volt = *f4_volt_ptr;
 	ArrayLib::ArrayENG<f4vector>& f4_curr = *f4_curr_ptr;
-	ArrayLib::ArrayENG<f4vector>& f4_vv = *Op->f4_vv_ptr;
-	ArrayLib::ArrayENG<f4vector>& f4_vi = *Op->f4_vi_ptr;
+	const Coeffs_SSE& coeffs = Op->GetCoeffsAs<Coeffs_SSE>();
+	ArrayLib::ArrayENG<f4vector>& f4_vv = *coeffs.f4_vv;
+	ArrayLib::ArrayENG<f4vector>& f4_vi = *coeffs.f4_vi;
 
 	unsigned int pos[3];
 	bool shift[2];
@@ -176,8 +177,9 @@ void Engine_sse::UpdateCurrents(unsigned int startX, unsigned int numX)
 {
 	ArrayLib::ArrayENG<f4vector>& f4_curr = *f4_curr_ptr;
 	ArrayLib::ArrayENG<f4vector>& f4_volt = *f4_volt_ptr;
-	ArrayLib::ArrayENG<f4vector>& f4_ii = *Op->f4_ii_ptr;
-	ArrayLib::ArrayENG<f4vector>& f4_iv = *Op->f4_iv_ptr;
+	const Coeffs_SSE& coeffs = Op->GetCoeffsAs<Coeffs_SSE>();
+	ArrayLib::ArrayENG<f4vector>& f4_ii = *coeffs.f4_ii;
+	ArrayLib::ArrayENG<f4vector>& f4_iv = *coeffs.f4_iv;
 
 	unsigned int pos[5];
 	f4vector temp;

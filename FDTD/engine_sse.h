@@ -93,6 +93,8 @@ protected:
 	unsigned int numVectors;
 
 public: //public access to the sse arrays for efficient extensions access... use careful...
+	//! number of f4vectors along z, the z-extent of f4_volt_ptr and f4_curr_ptr
+	unsigned int GetNumberOfVectors() const {return numVectors;}
 	ArrayLib::ArrayENG<f4vector>* f4_volt_ptr;
 	ArrayLib::ArrayENG<f4vector>* f4_curr_ptr;
 };

@@ -54,6 +54,7 @@ Operator::Operator() : Operator_Base()
 	m_InvaildTimestep = false;
 	m_TimeStepVar = 3;
 	m_numThreads = 0;
+	m_Coeffs = new Coeffs_Basic();
 }
 
 Operator::~Operator()
@@ -63,6 +64,13 @@ Operator::~Operator()
 	m_Op_exts.clear();
 
 	Delete();
+	delete m_Coeffs;
+}
+
+void Operator::SetCoeffs(Operator_Coeffs* coeffs)
+{
+	delete m_Coeffs;
+	m_Coeffs = coeffs;
 }
 
 Engine* Operator::CreateEngine()
@@ -78,10 +86,7 @@ void Operator::Init()
 
 	Operator_Base::Init();
 
-	vv_ptr = NULL;
-	vi_ptr = NULL;
-	iv_ptr = NULL;
-	ii_ptr = NULL;
+	m_Coeffs->Free();
 
 	m_epsR_ptr = NULL;
 	m_kappa_ptr = NULL;
@@ -107,14 +112,7 @@ void Operator::Delete()
 {
 	CSX = NULL;
 
-	delete vv_ptr;
-	delete vi_ptr;
-	delete iv_ptr;
-	delete ii_ptr;
-	vv_ptr = NULL;
-	vi_ptr = NULL;
-	iv_ptr = NULL;
-	ii_ptr = NULL;
+	m_Coeffs->Free();
 
 	delete MainOp; MainOp=0;
 	for (int n=0; n<3; ++n)
@@ -538,6 +536,7 @@ void Operator::ShowStat() const
 	cout << "Nyquist criteria (TS)\t: " << m_Exc->GetNyquistNum() << endl;
 	cout << "Nyquist criteria (s)\t: " << m_Exc->GetNyquistNum()*dT << endl;
 	cout << "-----------------------------------" << endl;
+	m_Coeffs->ShowStat(cout);
 }
 
 void Operator::ShowExtStat() const
@@ -843,14 +842,7 @@ double Operator::GetMinMeshStep() const
 
 void Operator::InitOperator()
 {
-	delete vv_ptr;
-	delete vi_ptr;
-	delete iv_ptr;
-	delete ii_ptr;
-	vv_ptr = new ArrayLib::ArrayNIJK<FDTD_FLOAT>("vv", numLines);
-	vi_ptr = new ArrayLib::ArrayNIJK<FDTD_FLOAT>("vi", numLines);
-	iv_ptr = new ArrayLib::ArrayNIJK<FDTD_FLOAT>("iv", numLines);
-	ii_ptr = new ArrayLib::ArrayNIJK<FDTD_FLOAT>("ii", numLines);
+	m_Coeffs->Init(numLines);
 }
 
 void Operator::InitDataStorage()
@@ -1098,6 +1090,8 @@ int Operator::CalcECOperator( DebugFlags debugFlags )
 		delete[] EC_R[n];
 		EC_R[n]=NULL;
 	}
+
+	m_Coeffs->Finalize();
 
 	return 0;
 }

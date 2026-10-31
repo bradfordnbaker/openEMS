@@ -111,8 +111,9 @@ void Engine::UpdateVoltages(unsigned int startX, unsigned int numX)
 {
 	ArrayLib::ArrayNIJK<FDTD_FLOAT>& volt = *volt_ptr;
 	ArrayLib::ArrayNIJK<FDTD_FLOAT>& curr = *curr_ptr;
-	ArrayLib::ArrayNIJK<FDTD_FLOAT>& vv = *Op->vv_ptr;
-	ArrayLib::ArrayNIJK<FDTD_FLOAT>& vi = *Op->vi_ptr;
+	const Coeffs_Basic& coeffs = Op->GetCoeffsAs<Coeffs_Basic>();
+	ArrayLib::ArrayNIJK<FDTD_FLOAT>& vv = *coeffs.vv;
+	ArrayLib::ArrayNIJK<FDTD_FLOAT>& vi = *coeffs.vi;
 
 	unsigned int pos[3];
 	bool shift[3];
@@ -171,8 +172,9 @@ void Engine::UpdateCurrents(unsigned int startX, unsigned int numX)
 {
 	ArrayLib::ArrayNIJK<FDTD_FLOAT>& curr = *curr_ptr;
 	ArrayLib::ArrayNIJK<FDTD_FLOAT>& volt = *volt_ptr;
-	ArrayLib::ArrayNIJK<FDTD_FLOAT>& ii = *Op->ii_ptr;
-	ArrayLib::ArrayNIJK<FDTD_FLOAT>& iv = *Op->iv_ptr;
+	const Coeffs_Basic& coeffs = Op->GetCoeffsAs<Coeffs_Basic>();
+	ArrayLib::ArrayNIJK<FDTD_FLOAT>& ii = *coeffs.ii;
+	ArrayLib::ArrayNIJK<FDTD_FLOAT>& iv = *coeffs.iv;
 
 	unsigned int pos[3];
 	pos[0] = startX;

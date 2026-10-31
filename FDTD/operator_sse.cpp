@@ -15,9 +15,9 @@
 *	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+
 #include "engine_sse.h"
 #include "operator_sse.h"
-//#include "processfields.h"
 
 using std::cout;
 using std::endl;
@@ -32,15 +32,11 @@ Operator_sse* Operator_sse::New()
 
 Operator_sse::Operator_sse() : Operator()
 {
-	f4_vv_ptr = NULL;
-	f4_vi_ptr = NULL;
-	f4_iv_ptr = NULL;
-	f4_ii_ptr = NULL;
+	SetCoeffs(new Coeffs_SSE());
 }
 
 Operator_sse::~Operator_sse()
 {
-	Delete();
 }
 
 Engine* Operator_sse::CreateEngine()
@@ -48,55 +44,4 @@ Engine* Operator_sse::CreateEngine()
 	//! create a special sse-engine
 	m_Engine = Engine_sse::New(this);
 	return m_Engine;
-}
-
-void Operator_sse::Init()
-{
-	Operator::Init();
-	f4_vv_ptr = NULL;
-	f4_vi_ptr = NULL;
-	f4_iv_ptr = NULL;
-	f4_ii_ptr = NULL;
-}
-
-void Operator_sse::Delete()
-{
-	delete f4_vv_ptr;
-	delete f4_vi_ptr;
-	delete f4_iv_ptr;
-	delete f4_ii_ptr;
-	f4_vv_ptr = NULL;
-	f4_vi_ptr = NULL;
-	f4_iv_ptr = NULL;
-	f4_ii_ptr = NULL;
-}
-
-void Operator_sse::Reset()
-{
-	Delete();
-	Operator::Reset();
-}
-
-
-void Operator_sse::InitOperator()
-{
-	delete f4_vv_ptr;
-	delete f4_vi_ptr;
-	delete f4_iv_ptr;
-	delete f4_ii_ptr;
-
-	numVectors =  ceil((double)numLines[2]/4.0);
-
-	f4_vv_ptr = new ArrayLib::ArrayENG<f4vector>(
-		"f4_vv", {numLines[0], numLines[1], numVectors}
-	);
-	f4_vi_ptr = new ArrayLib::ArrayENG<f4vector>(
-		"f4_vi", {numLines[0], numLines[1], numVectors}
-	);
-	f4_iv_ptr = new ArrayLib::ArrayENG<f4vector>(
-		"f4_iv", {numLines[0], numLines[1], numVectors}
-	);
-	f4_ii_ptr = new ArrayLib::ArrayENG<f4vector>(
-		"f4_ii", {numLines[0], numLines[1], numVectors}
-	);
 }

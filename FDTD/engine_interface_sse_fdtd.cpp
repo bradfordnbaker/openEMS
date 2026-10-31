@@ -50,7 +50,7 @@ double Engine_Interface_SSE_FDTD::CalcFastEnergy() const
 	{
 		for (pos[1]=0; pos[1]<m_Op_SSE->GetNumberOfLines(1)-1; ++pos[1])
 		{
-			for (pos[2]=0; pos[2]<m_Op_SSE->numVectors; ++pos[2])
+			for (pos[2]=0; pos[2]<m_Eng_SSE->GetNumberOfVectors(); ++pos[2])
 			{
 				ArrayLib::ArrayNIJK<f4vector>& f4_volt = *m_Eng_SSE->Engine_sse::f4_volt_ptr;
 				ArrayLib::ArrayNIJK<f4vector>& f4_curr = *m_Eng_SSE->Engine_sse::f4_curr_ptr;
