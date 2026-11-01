@@ -19,6 +19,7 @@
 #include <cstring>
 #include <iostream>
 #include <map>
+#include <stdexcept>
 
 #include "operator_coeffs.h"
 #include "tools/global.h"
@@ -43,7 +44,7 @@ Coeffs_Basic::~Coeffs_Basic()
 
 void Coeffs_Basic::Init(const unsigned int numLines[3])
 {
-	Free();
+	Coeffs_Basic::Free();
 	unsigned int lines[3] = {numLines[0], numLines[1], numLines[2]};
 	vv = new ArrayLib::ArrayNIJK<FDTD_FLOAT>("vv", lines);
 	vi = new ArrayLib::ArrayNIJK<FDTD_FLOAT>("vi", lines);
@@ -65,54 +66,6 @@ void Coeffs_Basic::Free()
 
 // ----------------------------------------------------------------------------
 
-Coeffs_SSE::Coeffs_SSE()
-{
-	numVectors = 0;
-	f4_vv = NULL;
-	f4_vi = NULL;
-	f4_iv = NULL;
-	f4_ii = NULL;
-}
-
-Coeffs_SSE::~Coeffs_SSE()
-{
-	Coeffs_SSE::Free();
-}
-
-void Coeffs_SSE::Init(const unsigned int numLines[3])
-{
-	Coeffs_SSE::Free();
-
-	numVectors =  ceil((double)numLines[2]/4.0);
-
-	f4_vv = new ArrayLib::ArrayENG<f4vector>(
-		"f4_vv", {numLines[0], numLines[1], numVectors}
-	);
-	f4_vi = new ArrayLib::ArrayENG<f4vector>(
-		"f4_vi", {numLines[0], numLines[1], numVectors}
-	);
-	f4_iv = new ArrayLib::ArrayENG<f4vector>(
-		"f4_iv", {numLines[0], numLines[1], numVectors}
-	);
-	f4_ii = new ArrayLib::ArrayENG<f4vector>(
-		"f4_ii", {numLines[0], numLines[1], numVectors}
-	);
-}
-
-void Coeffs_SSE::Free()
-{
-	delete f4_vv;
-	delete f4_vi;
-	delete f4_iv;
-	delete f4_ii;
-	f4_vv = NULL;
-	f4_vi = NULL;
-	f4_iv = NULL;
-	f4_ii = NULL;
-}
-
-// ----------------------------------------------------------------------------
-
 //! the 24 f4vector coefficients of one node, the key for finding identical ones (Coeffs_SSE_Compressed::Finalize)
 class SSE_coeff
 {
@@ -129,8 +82,9 @@ protected:
 	f4vector m_ii[3];
 };
 
-Coeffs_SSE_Compressed::Coeffs_SSE_Compressed() : Coeffs_SSE()
+Coeffs_SSE_Compressed::Coeffs_SSE_Compressed() : Coeffs_Basic()
 {
+	numVectors = 0;
 	use_compression = false;
 	m_numLines[0] = m_numLines[1] = m_numLines[2] = 0;
 }
@@ -155,17 +109,23 @@ void Coeffs_SSE_Compressed::ClearCompressed()
 void Coeffs_SSE_Compressed::Init(const unsigned int numLines[3])
 {
 	ClearCompressed();
-	Coeffs_SSE::Init(numLines);
+	index.Reset();
+	Coeffs_Basic::Init(numLines);
 	for (int n=0; n<3; ++n)
 		m_numLines[n] = numLines[n];
-	unsigned int lines[3] = {numLines[0], numLines[1], numLines[2]};
-	index.Init("Op_index", lines);
+	numVectors = ceil((double)numLines[2]/4.0);
 }
 
 void Coeffs_SSE_Compressed::Free()
 {
 	ClearCompressed();
-	Coeffs_SSE::Free();
+	index.Reset();
+	Coeffs_Basic::Free();
+}
+
+void Coeffs_SSE_Compressed::ThrowCompressed()
+{
+	throw std::logic_error("Coeffs_SSE_Compressed: the coefficients are compressed, a Set function would change all nodes sharing the set");
 }
 
 void Coeffs_SSE_Compressed::ShowStat(std::ostream& ostr) const
@@ -182,10 +142,21 @@ void Coeffs_SSE_Compressed::Finalize()
 	if (g_settings.GetVerboseLevel()>0)
 		cout << "Compressing the FDTD operator... this may take a while..." << endl;
 
-	ArrayLib::ArrayNIJK<f4vector>& f4_vv_full = *f4_vv;
-	ArrayLib::ArrayNIJK<f4vector>& f4_vi_full = *f4_vi;
-	ArrayLib::ArrayNIJK<f4vector>& f4_iv_full = *f4_iv;
-	ArrayLib::ArrayNIJK<f4vector>& f4_ii_full = *f4_ii;
+	unsigned int idx_lines[3] = {m_numLines[0], m_numLines[1], numVectors};
+	index.Init("Op_index", idx_lines);
+
+	// the coefficients of the four z-lines z+k*numVectors in lane k, lanes beyond the last line 0
+	ArrayLib::ArrayNIJK<FDTD_FLOAT>* full[4] = {vv, vi, iv, ii};
+	auto gather = [&](int c, int n, const unsigned int pos[3])
+	{
+		f4vector f;
+		for (unsigned int k=0; k<4; ++k)
+		{
+			unsigned int z = pos[2] + k*numVectors;
+			f.f[k] = (z<m_numLines[2]) ? (*full[c])(n, pos[0], pos[1], z) : 0;
+		}
+		return f;
+	};
 
 	std::map<SSE_coeff,unsigned int> lookUpMap;
 
@@ -196,11 +167,11 @@ void Coeffs_SSE_Compressed::Finalize()
 		{
 			for (pos[2]=0; pos[2]<numVectors; ++pos[2])
 			{
-				f4vector vv[3] = { f4_vv_full(0, pos[0], pos[1], pos[2]), f4_vv_full(1, pos[0], pos[1], pos[2]), f4_vv_full(2, pos[0], pos[1], pos[2]) };
-				f4vector vi[3] = { f4_vi_full(0, pos[0], pos[1], pos[2]), f4_vi_full(1, pos[0], pos[1], pos[2]), f4_vi_full(2, pos[0], pos[1], pos[2]) };
-				f4vector iv[3] = { f4_iv_full(0, pos[0], pos[1], pos[2]), f4_iv_full(1, pos[0], pos[1], pos[2]), f4_iv_full(2, pos[0], pos[1], pos[2]) };
-				f4vector ii[3] = { f4_ii_full(0, pos[0], pos[1], pos[2]), f4_ii_full(1, pos[0], pos[1], pos[2]), f4_ii_full(2, pos[0], pos[1], pos[2]) };
-				SSE_coeff c( vv, vi, iv, ii );
+				f4vector vv4[3] = { gather(0, 0, pos), gather(0, 1, pos), gather(0, 2, pos) };
+				f4vector vi4[3] = { gather(1, 0, pos), gather(1, 1, pos), gather(1, 2, pos) };
+				f4vector iv4[3] = { gather(2, 0, pos), gather(2, 1, pos), gather(2, 2, pos) };
+				f4vector ii4[3] = { gather(3, 0, pos), gather(3, 1, pos), gather(3, 2, pos) };
+				SSE_coeff c( vv4, vi4, iv4, ii4 );
 
 				std::map<SSE_coeff,unsigned int>::iterator it;
 				it = lookUpMap.find(c);
@@ -210,10 +181,10 @@ void Coeffs_SSE_Compressed::Finalize()
 					unsigned int idx = f4_vv_Compressed[0].size();
 					for (int n=0; n<3; n++)
 					{
-						f4_vv_Compressed[n].push_back( vv[n] );
-						f4_vi_Compressed[n].push_back( vi[n] );
-						f4_iv_Compressed[n].push_back( iv[n] );
-						f4_ii_Compressed[n].push_back( ii[n] );
+						f4_vv_Compressed[n].push_back( vv4[n] );
+						f4_vi_Compressed[n].push_back( vi4[n] );
+						f4_iv_Compressed[n].push_back( iv4[n] );
+						f4_ii_Compressed[n].push_back( ii4[n] );
 					}
 					lookUpMap[c] = idx;
 					index(pos[0], pos[1], pos[2]) = idx;
@@ -227,7 +198,7 @@ void Coeffs_SSE_Compressed::Finalize()
 		}
 	}
 
-	Coeffs_SSE::Free();
+	Coeffs_Basic::Free();
 	use_compression = true;
 }
 

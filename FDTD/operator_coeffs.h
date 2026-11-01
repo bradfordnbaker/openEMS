@@ -27,7 +27,6 @@
 #include "tools/aligned_allocator.h"
 #include "tools/arraylib/array_nijk.h"
 #include "tools/arraylib/array_ijk.h"
-#include "tools/arraylib/array_e.h"
 
 //! The update coefficients of the operator: vv, vi (voltage update) and ii, iv (current update) per node and direction
 /*!
@@ -80,39 +79,20 @@ public:
 
 	ArrayLib::ArrayNIJK<FDTD_FLOAT>* vv; //!< calc new voltage from old voltage
 	ArrayLib::ArrayNIJK<FDTD_FLOAT>* vi; //!< calc new voltage from old current
-	ArrayLib::ArrayNIJK<FDTD_FLOAT>* iv; //!< calc new current from old current
-	ArrayLib::ArrayNIJK<FDTD_FLOAT>* ii; //!< calc new current from old voltage
+	ArrayLib::ArrayNIJK<FDTD_FLOAT>* iv; //!< calc new current from old voltage
+	ArrayLib::ArrayNIJK<FDTD_FLOAT>* ii; //!< calc new current from old current
 };
 
-//! Four z-lines interleaved per f4vector, the layout Coeffs_SSE_Compressed is built in
-class Coeffs_SSE : public Operator_Coeffs
-{
-public:
-	Coeffs_SSE();
-	virtual ~Coeffs_SSE();
-
-	virtual void Init(const unsigned int numLines[3]);
-	virtual void Free();
-
-	inline virtual FDTD_FLOAT GetVV(unsigned int n, unsigned int x, unsigned int y, unsigned int z) const {return (*f4_vv)(n, x, y, z%numVectors).f[z/numVectors];}
-	inline virtual FDTD_FLOAT GetVI(unsigned int n, unsigned int x, unsigned int y, unsigned int z) const {return (*f4_vi)(n, x, y, z%numVectors).f[z/numVectors];}
-	inline virtual FDTD_FLOAT GetII(unsigned int n, unsigned int x, unsigned int y, unsigned int z) const {return (*f4_ii)(n, x, y, z%numVectors).f[z/numVectors];}
-	inline virtual FDTD_FLOAT GetIV(unsigned int n, unsigned int x, unsigned int y, unsigned int z) const {return (*f4_iv)(n, x, y, z%numVectors).f[z/numVectors];}
-
-	inline virtual void SetVV(unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value) {(*f4_vv)(n, x, y, z%numVectors).f[z/numVectors] = value;}
-	inline virtual void SetVI(unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value) {(*f4_vi)(n, x, y, z%numVectors).f[z/numVectors] = value;}
-	inline virtual void SetII(unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value) {(*f4_ii)(n, x, y, z%numVectors).f[z/numVectors] = value;}
-	inline virtual void SetIV(unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value) {(*f4_iv)(n, x, y, z%numVectors).f[z/numVectors] = value;}
-
-	unsigned int numVectors;
-	ArrayLib::ArrayENG<f4vector>* f4_vv; //!< calc new voltage from old voltage
-	ArrayLib::ArrayENG<f4vector>* f4_vi; //!< calc new voltage from old current
-	ArrayLib::ArrayENG<f4vector>* f4_iv; //!< calc new current from old current
-	ArrayLib::ArrayENG<f4vector>* f4_ii; //!< calc new current from old voltage
-};
-
-//! Coeffs_SSE, of which Finalize() keeps only the distinct coefficient sets plus an index per node (Engine_sse)
-class Coeffs_SSE_Compressed : public Coeffs_SSE
+//! The coefficients of Engine_sse: the distinct sets of four z-lines (one f4vector per coefficient and direction) plus an index per node
+/*!
+  The operator builds into the Coeffs_Basic arrays. Finalize() gathers the
+  z-lines z, z+numVectors, z+2*numVectors, z+3*numVectors into the four lanes of
+  one f4vector (the field layout of Engine_sse, lanes beyond the last line 0),
+  keeps each distinct set of the 24 f4vectors of a node once and frees the basic
+  arrays. After that the Get functions read the compressed sets; the Set
+  functions throw, as a set is shared by many nodes.
+  */
+class Coeffs_SSE_Compressed : public Coeffs_Basic
 {
 public:
 	Coeffs_SSE_Compressed();
@@ -120,24 +100,25 @@ public:
 
 	virtual void Init(const unsigned int numLines[3]);
 	virtual void Free();
-	//! Compress the coefficients and free the full arrays
+	//! Compress the coefficients and free the basic arrays
 	virtual void Finalize();
 	virtual void ShowStat(std::ostream& ostr) const;
 
 	bool IsCompressed() const {return use_compression;}
 
-	inline virtual FDTD_FLOAT GetVV( unsigned int n, unsigned int x, unsigned int y, unsigned int z ) const { if (use_compression) return f4_vv_Compressed[n][index(x, y, z%numVectors)].f[z/numVectors]; else return Coeffs_SSE::GetVV(n,x,y,z);}
-	inline virtual FDTD_FLOAT GetVI( unsigned int n, unsigned int x, unsigned int y, unsigned int z ) const { if (use_compression) return f4_vi_Compressed[n][index(x, y, z%numVectors)].f[z/numVectors]; else return Coeffs_SSE::GetVI(n,x,y,z);}
-	inline virtual FDTD_FLOAT GetII( unsigned int n, unsigned int x, unsigned int y, unsigned int z ) const { if (use_compression) return f4_ii_Compressed[n][index(x, y, z%numVectors)].f[z/numVectors]; else return Coeffs_SSE::GetII(n,x,y,z);}
-	inline virtual FDTD_FLOAT GetIV( unsigned int n, unsigned int x, unsigned int y, unsigned int z ) const { if (use_compression) return f4_iv_Compressed[n][index(x, y, z%numVectors)].f[z/numVectors]; else return Coeffs_SSE::GetIV(n,x,y,z);}
+	inline virtual FDTD_FLOAT GetVV(unsigned int n, unsigned int x, unsigned int y, unsigned int z) const {if (use_compression) return f4_vv_Compressed[n][index(x, y, z%numVectors)].f[z/numVectors]; return Coeffs_Basic::GetVV(n, x, y, z);}
+	inline virtual FDTD_FLOAT GetVI(unsigned int n, unsigned int x, unsigned int y, unsigned int z) const {if (use_compression) return f4_vi_Compressed[n][index(x, y, z%numVectors)].f[z/numVectors]; return Coeffs_Basic::GetVI(n, x, y, z);}
+	inline virtual FDTD_FLOAT GetII(unsigned int n, unsigned int x, unsigned int y, unsigned int z) const {if (use_compression) return f4_ii_Compressed[n][index(x, y, z%numVectors)].f[z/numVectors]; return Coeffs_Basic::GetII(n, x, y, z);}
+	inline virtual FDTD_FLOAT GetIV(unsigned int n, unsigned int x, unsigned int y, unsigned int z) const {if (use_compression) return f4_iv_Compressed[n][index(x, y, z%numVectors)].f[z/numVectors]; return Coeffs_Basic::GetIV(n, x, y, z);}
 
-	inline virtual void SetVV( unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value ) { if (use_compression) f4_vv_Compressed[n][index(x, y, z%numVectors)].f[z/numVectors] = value; else Coeffs_SSE::SetVV(n,x,y,z,value);}
-	inline virtual void SetVI( unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value ) { if (use_compression) f4_vi_Compressed[n][index(x, y, z%numVectors)].f[z/numVectors] = value; else Coeffs_SSE::SetVI(n,x,y,z,value);}
-	inline virtual void SetII( unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value ) { if (use_compression) f4_ii_Compressed[n][index(x, y, z%numVectors)].f[z/numVectors] = value; else Coeffs_SSE::SetII(n,x,y,z,value);}
-	inline virtual void SetIV( unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value ) { if (use_compression) f4_iv_Compressed[n][index(x, y, z%numVectors)].f[z/numVectors] = value; else Coeffs_SSE::SetIV(n,x,y,z,value);}
+	inline virtual void SetVV(unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value) {if (use_compression) ThrowCompressed(); Coeffs_Basic::SetVV(n, x, y, z, value);}
+	inline virtual void SetVI(unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value) {if (use_compression) ThrowCompressed(); Coeffs_Basic::SetVI(n, x, y, z, value);}
+	inline virtual void SetII(unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value) {if (use_compression) ThrowCompressed(); Coeffs_Basic::SetII(n, x, y, z, value);}
+	inline virtual void SetIV(unsigned int n, unsigned int x, unsigned int y, unsigned int z, FDTD_FLOAT value) {if (use_compression) ThrowCompressed(); Coeffs_Basic::SetIV(n, x, y, z, value);}
 
+	unsigned int numVectors;   //!< f4vectors per z-line, ceil(numLines[2]/4)
 	bool use_compression;
-	ArrayLib::ArrayIJK<unsigned int> index;
+	ArrayLib::ArrayIJK<unsigned int> index;   //!< the set of each node, x, y and the f4vector along z
 	std::vector<f4vector,aligned_allocator<f4vector> > f4_vv_Compressed[3];
 	std::vector<f4vector,aligned_allocator<f4vector> > f4_vi_Compressed[3];
 	std::vector<f4vector,aligned_allocator<f4vector> > f4_iv_Compressed[3];
@@ -146,6 +127,7 @@ public:
 protected:
 	unsigned int m_numLines[3];
 	void ClearCompressed();
+	[[noreturn]] static void ThrowCompressed();
 };
 
 #endif // OPERATOR_COEFFS_H
