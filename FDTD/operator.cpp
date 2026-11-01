@@ -1857,11 +1857,7 @@ unsigned int Operator::GetBuildThreads() const
 	return m_numThreads;
 }
 
-void Operator::CalcStartStopLines(
-	unsigned int &numThreads,
-	std::vector<unsigned int> &start,
-	std::vector<unsigned int> &stop
-) const
+void Operator::CalcStartStopLines(unsigned int &numThreads, std::vector<unsigned int> &start, std::vector<unsigned int> &stop) const
 {
 	std::vector<unsigned int> jpt = AssignJobs2Threads(numLines[0], numThreads, true);
 

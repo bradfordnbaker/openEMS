@@ -109,11 +109,7 @@ protected:
 
 	void SetupInterpolation();
 
-	virtual void CalcStartStopLines(
-		unsigned int &numThreads,
-		std::vector<unsigned int> &start,
-		std::vector<unsigned int> &stop
-	) const;
+	virtual void CalcStartStopLines(unsigned int &numThreads, std::vector<unsigned int> &start, std::vector<unsigned int> &stop) const;
 };
 
 #endif // OPERATOR_CYLINDERMULTIGRID_H

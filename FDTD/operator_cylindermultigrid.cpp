@@ -214,11 +214,7 @@ bool Operator_CylinderMultiGrid::GetYeeCoords(int ny, unsigned int pos[3], doubl
 	return ret;
 }
 
-void Operator_CylinderMultiGrid::CalcStartStopLines(
-	unsigned int &numThreads,
-	std::vector<unsigned int> &start,
-	std::vector<unsigned int> &stop
-) const
+void Operator_CylinderMultiGrid::CalcStartStopLines(unsigned int &numThreads, std::vector<unsigned int> &start, std::vector<unsigned int> &stop) const
 {
 	std::vector<unsigned int> jpt = AssignJobs2Threads(
 		numLines[0]- m_Split_Pos + 1, numThreads, true

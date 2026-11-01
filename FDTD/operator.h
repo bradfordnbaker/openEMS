@@ -221,11 +221,7 @@ public:
 	unsigned int GetNumThreads() const {return m_numThreads;}
 
 	//! Split the lines in x-direction into ranges for up to \a numThreads threads; \a numThreads returns the number of ranges. Used for the operator build and by Engine_ThreadPool.
-	virtual void CalcStartStopLines(
-		unsigned int &numThreads,
-		std::vector<unsigned int> &start,
-		std::vector<unsigned int> &stop
-	) const;
+	virtual void CalcStartStopLines(unsigned int &numThreads, std::vector<unsigned int> &start, std::vector<unsigned int> &stop) const;
 
 protected:
 	//! use New() for creating a new Operator
