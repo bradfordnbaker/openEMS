@@ -162,7 +162,9 @@ def gpu_devices(path, xml, rundir, gpu_device):
         cmd.append('--gpu-device={}'.format(gpu_device))
     out = subprocess.run(cmd, cwd=rundir, capture_output=True, text=True)
     text = out.stdout + out.stderr
-    if 'Create FDTD operator (GPU)' not in text:
+    # the operator line ends in the engine type on every mesh; it is printed only once a
+    # backend with a usable device exists (--no-simulation creates no engine)
+    if not re.search(r'^Create .*FDTD operator.* \(GPU\)$', text, re.M):
         return []
     m = re.search(r'^GPU devices:\n((?:  .*\n)*)', text, re.M)
     return [l.strip() for l in m.group(1).splitlines()] if m else ['unknown device']

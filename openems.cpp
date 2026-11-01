@@ -845,18 +845,24 @@ bool openEMS::SetupOperator()
 	else if (m_engine == EngineType_Basic)
 		type = Engine::BASIC;
 
+	// one line for every mesh, ending in the engine type (bench.py looks for "(GPU)")
+	const char* names[] = {"basic + multi-threading", "compressed SSE + multi-threading", "GPU"};
 	if (CylinderCoords)
 	{
 		Operator_Cylinder* op_cyl = NULL;
 		if (m_CC_MultiGrid.size()>0)
 			op_cyl = Operator_CylinderMultiGrid::New(m_CC_MultiGrid, m_engine_numThreads);
-		if (op_cyl==NULL)
+		if (op_cyl)
+			cout << "Create cylindrical multi-grid FDTD operator with " << m_CC_MultiGrid.size() << " sub-grid" << (m_CC_MultiGrid.size()==1 ? "" : "s") << " (" << names[type] << ")" << endl;
+		else
+		{
 			op_cyl = Operator_Cylinder::New(m_engine_numThreads);
+			cout << "Create cylindrical FDTD operator (" << names[type] << ")" << endl;
+		}
 		FDTD_Op = op_cyl;
 	}
 	else
 	{
-		const char* names[] = {"basic + multi-threading", "compressed SSE + multi-threading", "GPU"};
 		cout << "Create FDTD operator (" << names[type] << ")" << endl;
 		FDTD_Op = Operator::New();
 		FDTD_Op->SetNumThreads(m_engine_numThreads);

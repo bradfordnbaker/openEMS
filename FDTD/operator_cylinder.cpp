@@ -28,7 +28,6 @@ using std::endl;
 
 Operator_Cylinder* Operator_Cylinder::New(unsigned int numThreads)
 {
-	cout << "Create cylindrical FDTD operator" << endl;
 	Operator_Cylinder* op = new Operator_Cylinder();
 	op->SetNumThreads(numThreads);
 	op->Init();

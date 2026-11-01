@@ -55,7 +55,6 @@ Operator_CylinderMultiGrid* Operator_CylinderMultiGrid::New(
 		cerr << "Operator_CylinderMultiGrid::New: Warning: Number of multigrids invalid! Split-Number: " << Split_Radii.size() << endl;
 		return NULL;
 	}
-	cout << "Create cylindrical multi grid FDTD operator " << endl;
 	Operator_CylinderMultiGrid* op = new Operator_CylinderMultiGrid(Split_Radii, level);
 	op->SetNumThreads(numThreads);
 	op->Init();
