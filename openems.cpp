@@ -839,11 +839,11 @@ bool openEMS::SetupOperator()
 		}
 	}
 
-	Operator::EngineKind kind = Operator::ENGINE_SSE;
+	Engine::EngineType type = Engine::SSE;
 	if (gpu)
-		kind = Operator::ENGINE_GPU;
+		type = Engine::GPU;
 	else if (m_engine == EngineType_Basic)
-		kind = Operator::ENGINE_BASIC;
+		type = Engine::BASIC;
 
 	if (CylinderCoords)
 	{
@@ -857,11 +857,11 @@ bool openEMS::SetupOperator()
 	else
 	{
 		const char* names[] = {"basic + multi-threading", "compressed SSE + multi-threading", "GPU"};
-		cout << "Create FDTD operator (" << names[kind] << ")" << endl;
+		cout << "Create FDTD operator (" << names[type] << ")" << endl;
 		FDTD_Op = Operator::New();
 		FDTD_Op->SetNumThreads(m_engine_numThreads);
 	}
-	FDTD_Op->SetEngineKind(kind);
+	FDTD_Op->SetEngineType(type);
 	if (gpu)
 		FDTD_Op->SetGPUBackend(gpu_backend);
 	return true;

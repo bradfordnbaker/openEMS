@@ -45,7 +45,7 @@ public:
 	virtual double GetNumberCells() const;
 
 	//! The engine of every grid level
-	virtual void SetEngineKind(EngineKind kind);
+	virtual void SetEngineType(Engine_Types::EngineType type);
 	virtual Engine* CreateEngine();
 
 	virtual bool SetGeometryCSX(ContinuousStructure* geo);

@@ -57,7 +57,7 @@ Operator::Operator() : Operator_Base()
 	m_TimeStepVar = 3;
 	m_numThreads = 0;
 	m_Coeffs = new Coeffs_Basic();
-	m_EngineKind = ENGINE_BASIC;
+	m_EngineType = Engine::BASIC;
 	m_GPU_Backend = NULL;
 	m_GPU_Parent = NULL;
 }
@@ -73,14 +73,16 @@ Operator::~Operator()
 	delete m_GPU_Backend;
 }
 
-void Operator::SetEngineKind(EngineKind kind)
+void Operator::SetEngineType(Engine_Types::EngineType type)
 {
-	if (kind==m_EngineKind)
+	if ((type!=Engine::BASIC) && (type!=Engine::SSE) && (type!=Engine::GPU))
+		throw std::invalid_argument("Operator::SetEngineType: no such engine type");
+	if (type==m_EngineType)
 		return;
-	m_EngineKind = kind;
+	m_EngineType = type;
 	// the GPU backends read the coefficients through GetVV() and friends, in any layout; the
 	// basic one is the fastest to build and read (the HIP backend makes its own sets anyway)
-	if (kind!=ENGINE_SSE)
+	if (type!=Engine::SSE)
 		SetCoeffs(new Coeffs_Basic());
 	else
 		SetCoeffs(new Coeffs_SSE_Compressed());
@@ -102,15 +104,15 @@ void Operator::SetCoeffs(Operator_Coeffs* coeffs)
 
 Engine* Operator::CreateEngine()
 {
-	switch (m_EngineKind)
+	switch (m_EngineType)
 	{
-	case ENGINE_GPU:
+	case Engine::GPU:
 		m_Engine = Engine_GPU::New(this, TakeGPUBackend(), m_GPU_Parent);
 		// The device holds the coefficients now: free the host ones (48 bytes per node),
 		// as the compressed storage frees its full arrays. GetVV() and friends are invalid after this.
 		m_Coeffs->Free();
 		break;
-	case ENGINE_SSE:
+	case Engine::SSE:
 		m_Engine = Engine_sse::New(this, m_numThreads);
 		break;
 	default:

@@ -32,7 +32,7 @@ The pipeline, and where each part lives:
    equivalent-circuit coefficients (`vv`, `vi`, `ii`, `iv`) for every Yee cell in
    `CalcECOperator()`, and holds the mesh (`discLines[]`). The coefficients live
    in an `Operator_Coeffs` (`FDTD/operator_coeffs.h`) in the layout the engine
-   reads: basic or compressed SSE, chosen by `SetEngineKind()` with the
+   reads: basic or compressed SSE, chosen by `SetEngineType()` with the
    engine. The subclasses are the mesh geometry:
    `Operator_Cylinder`/`_CylinderMultiGrid`.
 3. **`Engine`** (`FDTD/engine.h`) time-steps those coefficients —

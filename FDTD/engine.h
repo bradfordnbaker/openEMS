@@ -20,6 +20,7 @@
 
 #include <fstream>
 #include "operator.h"
+#include "engine_type.h"
 
 #include "tools/arraylib/array_nijk.h"
 
@@ -27,14 +28,9 @@ class Engine_Extension;
 class Engine_ThreadPool;
 class Engine_SubGridCoupling;
 
-class Engine
+class Engine : public Engine_Types
 {
 public:
-	enum EngineType
-	{
-		BASIC, SSE, GPU, UNKNOWN
-	};
-
 	//! A basic engine on \a numThreads threads, 0 for finding the best number while running (see NextInterval())
 	static Engine* New(const Operator* op, unsigned int numThreads = 0);
 	virtual ~Engine();

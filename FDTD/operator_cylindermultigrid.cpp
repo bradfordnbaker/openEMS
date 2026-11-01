@@ -81,15 +81,15 @@ void Operator_CylinderMultiGrid::GetInterpolation(GPU_MultiGridInterpolation& in
 		}
 }
 
-void Operator_CylinderMultiGrid::SetEngineKind(EngineKind kind)
+void Operator_CylinderMultiGrid::SetEngineType(Engine_Types::EngineType type)
 {
-	Operator_Cylinder::SetEngineKind(kind);
-	m_InnerOp->SetEngineKind(kind);
+	Operator_Cylinder::SetEngineType(type);
+	m_InnerOp->SetEngineType(type);
 }
 
 Engine* Operator_CylinderMultiGrid::CreateEngine()
 {
-	if (m_EngineKind==ENGINE_GPU)
+	if (m_EngineType==Engine::GPU)
 	{
 		m_Engine = Engine_GPU_CylinderMultiGrid::New(this, TakeGPUBackend(), m_GPU_Parent);
 		// the device holds the coefficients now, see Operator::CreateEngine()
@@ -100,7 +100,7 @@ Engine* Operator_CylinderMultiGrid::CreateEngine()
 		// the engine of this grid, of the chosen type, and the sub-grid (created by its operator,
 		// so the field processing finds it) with the coupling for the field layout
 		Engine* sub = m_InnerOp->CreateEngine();
-		if (m_EngineKind==ENGINE_SSE)
+		if (m_EngineType==Engine::SSE)
 		{
 			Engine_sse* eng = Engine_sse::New(this, m_numThreads);
 			eng->SetSubGrid(sub, new SubGrid_Coupling_SSE(eng, dynamic_cast<Engine_sse*>(sub), this));
@@ -187,8 +187,8 @@ void Operator_CylinderMultiGrid::Init()
 		m_InnerOp = Operator_Cylinder::New(m_numThreads);
 	else
 		m_InnerOp = Operator_CylinderMultiGrid::New(m_Split_Radii,m_numThreads, m_MultiGridLevel+1);
-	if (m_EngineKind!=ENGINE_BASIC)
-		m_InnerOp->SetEngineKind(m_EngineKind);
+	if (m_EngineType!=Engine::BASIC)
+		m_InnerOp->SetEngineType(m_EngineType);
 
 	for (int n=0;n<2;++n)
 	{
