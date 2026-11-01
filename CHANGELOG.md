@@ -103,20 +103,16 @@ there are unreleased changes. It becomes the next release entry.
   computed ones. A few edges more can become metal, e.g. on sloped walls; a
   slit at x=0 in the split ground plane of the StripLine2MSL tutorial is
   closed.
-- Two CPU engines, both on all threads (`--numThreads`): `basic` and the
-  compressed SSE engine, the default. `--engine=sse` and `sse-compressed`
-  (`engine='sse'`...) are now other names of `multithreaded`; they and `basic`
-  ran on a single thread before. The results do not change. The operator is
-  built on all threads with every engine, which halves the setup of `basic`.
-- A cylindrical mesh, also with multi-grid levels, runs on the engine chosen
-  with `--engine`; `basic` was ignored there and the multithreaded engine
-  ran.
-- The grids of a cylindrical multi-grid mesh are stepped one after the other
-  by the same threads instead of by one thread pool each, with the same
-  results. With the default thread count the inner grids no longer stay on a
-  single thread: a 5.6 MCell model with two levels runs 12-25 % faster.
+- Two CPU engines, both on all threads (`--numThreads`) and on every mesh:
+  `basic` and the compressed SSE engine, the default. `--engine=sse` and
+  `sse-compressed` (`engine='sse'`...) are other names of `multithreaded`
+  now; they and `basic` ran on a single thread, and on a cylindrical mesh
+  every CPU engine choice ran the multithreaded one. The results do not
+  change. The setup of `basic` takes half the time, the default engine needs
+  about 4 % less memory, and a cylindrical multi-grid mesh of 5.6 MCell runs
+  12-25 % faster.
 - The GPU engine on a cylindrical mesh builds the plain host coefficients
-  instead of the compressed SSE ones, and frees them once the device has
+  instead of the compressed SSE ones and frees them once the device has
   them, as on a Cartesian mesh: with HIP the setup of an 8 MCell model takes
   5.6 instead of 6.2 s and 952 instead of 986 MiB.
 
