@@ -101,16 +101,10 @@ Engine* Operator_CylinderMultiGrid::CreateEngine()
 		// so the field processing finds it) with the coupling for the field layout
 		Engine* sub = m_InnerOp->CreateEngine();
 		if (m_EngineType==Engine::SSE)
-		{
-			Engine_sse* eng = Engine_sse::New(this, m_numThreads);
-			eng->SetSubGrid(sub, new SubGrid_Coupling_SSE(eng, dynamic_cast<Engine_sse*>(sub), this));
-			m_Engine = eng;
-		}
+			m_Engine = Engine_sse::New(this, m_numThreads);
 		else
-		{
 			m_Engine = Engine::New(this, m_numThreads);
-			m_Engine->SetSubGrid(sub, new SubGrid_Coupling_Basic(m_Engine, sub, this));
-		}
+		m_Engine->SetSubGrid(sub, Engine_SubGridCoupling::New(m_Engine, sub, this));
 	}
 	else
 		throw std::logic_error("Operator_CylinderMultiGrid::CreateEngine: no engine type set (SetEngineType())");

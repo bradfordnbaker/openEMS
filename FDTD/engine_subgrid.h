@@ -38,6 +38,9 @@ class Operator_CylinderMultiGrid;
 class Engine_SubGridCoupling
 {
 public:
+	//! The coupling for the field layout of \a base and \a sub (Engine::GetType()); throws if the two differ or there is none for it
+	static Engine_SubGridCoupling* New(Engine* base, Engine* sub, const Operator_CylinderMultiGrid* op);
+
 	virtual ~Engine_SubGridCoupling() {}
 	virtual void SyncVoltages() = 0;
 	virtual void SyncCurrents() = 0;

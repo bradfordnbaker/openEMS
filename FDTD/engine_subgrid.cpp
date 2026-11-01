@@ -19,6 +19,25 @@
 #include "engine_sse.h"
 #include "operator_cylindermultigrid.h"
 
+#include <stdexcept>
+
+// ----------------------------------------------------------------------------
+
+Engine_SubGridCoupling* Engine_SubGridCoupling::New(Engine* base, Engine* sub, const Operator_CylinderMultiGrid* op)
+{
+	if (base->GetType()!=sub->GetType())
+		throw std::logic_error("Engine_SubGridCoupling::New: the grid and its sub-grid run different engine types");
+	switch (base->GetType())
+	{
+	case Engine::SSE:
+		return new SubGrid_Coupling_SSE(static_cast<Engine_sse*>(base), static_cast<Engine_sse*>(sub), op);
+	case Engine::BASIC:
+		return new SubGrid_Coupling_Basic(base, sub, op);
+	default:
+		throw std::logic_error("Engine_SubGridCoupling::New: no coupling for this engine type");
+	}
+}
+
 // ----------------------------------------------------------------------------
 
 SubGrid_Coupling_Basic::SubGrid_Coupling_Basic(Engine* base, Engine* sub, const Operator_CylinderMultiGrid* op)
