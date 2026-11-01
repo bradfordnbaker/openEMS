@@ -57,7 +57,7 @@ Operator::Operator() : Operator_Base()
 	m_TimeStepVar = 3;
 	m_numThreads = 0;
 	m_Coeffs = NULL;
-	m_EngineType = Engine::BASIC;
+	m_EngineType = Engine::UNKNOWN;   // SetEngineType() before the build
 	m_GPU_Backend = NULL;
 	m_GPU_Parent = NULL;
 }
@@ -103,8 +103,11 @@ Engine* Operator::CreateEngine()
 	case Engine::SSE:
 		m_Engine = Engine_sse::New(this, m_numThreads);
 		break;
-	default:
+	case Engine::BASIC:
 		m_Engine = Engine::New(this, m_numThreads);
+		break;
+	default:
+		throw std::logic_error("Operator::CreateEngine: no engine type set (SetEngineType())");
 	}
 	return m_Engine;
 }
@@ -877,6 +880,8 @@ void Operator::InitOperator()
 {
 	// the layout the engine reads; the GPU backends read the coefficients through GetVV() and
 	// friends, in any layout, the basic one is the fastest to build and read
+	if (m_EngineType==Engine::UNKNOWN)
+		throw std::logic_error("Operator::InitOperator: no engine type set (SetEngineType())");
 	delete m_Coeffs;
 	if (m_EngineType==Engine::SSE)
 		m_Coeffs = new Coeffs_SSE_Compressed();

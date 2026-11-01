@@ -95,7 +95,7 @@ Engine* Operator_CylinderMultiGrid::CreateEngine()
 		// the device holds the coefficients now, see Operator::CreateEngine()
 		m_Coeffs->Free();
 	}
-	else
+	else if ((m_EngineType==Engine::SSE) || (m_EngineType==Engine::BASIC))
 	{
 		// the engine of this grid, of the chosen type, and the sub-grid (created by its operator,
 		// so the field processing finds it) with the coupling for the field layout
@@ -112,6 +112,8 @@ Engine* Operator_CylinderMultiGrid::CreateEngine()
 			m_Engine->SetSubGrid(sub, new SubGrid_Coupling_Basic(m_Engine, sub, this));
 		}
 	}
+	else
+		throw std::logic_error("Operator_CylinderMultiGrid::CreateEngine: no engine type set (SetEngineType())");
 	return m_Engine;
 }
 
@@ -187,7 +189,7 @@ void Operator_CylinderMultiGrid::Init()
 		m_InnerOp = Operator_Cylinder::New(m_numThreads);
 	else
 		m_InnerOp = Operator_CylinderMultiGrid::New(m_Split_Radii,m_numThreads, m_MultiGridLevel+1);
-	if (m_EngineType!=Engine::BASIC)
+	if (m_EngineType!=Engine::UNKNOWN)   // on a new operator SetEngineType() hands it on
 		m_InnerOp->SetEngineType(m_EngineType);
 
 	for (int n=0;n<2;++n)
