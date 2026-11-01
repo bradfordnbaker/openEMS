@@ -1,4 +1,5 @@
 /*
+*	Copyright (C) 2026 Sean Mollet (sean@malmoset.com)
 *	Copyright (C) 2026 Thorsten Liebig (Thorsten.Liebig@gmx.de)
 *
 *	This program is free software: you can redistribute it and/or modify
