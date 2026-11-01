@@ -638,8 +638,7 @@ FULL_DEVICE_BACKENDS = ('HIP', 'Metal')
 DEVICE_DFT_BACKENDS = ('HIP',)
 for name, case, on_device in cases:
     print(f'Testing case: {name}')
-    cpu = 'basic'   # the CPU reference
-    engines = (cpu, 'gpu-reference', 'gpu')
+    engines = ('basic', 'gpu-reference', 'gpu')
     if name.startswith(('cylinder', 'multigrid')):
         engines += ('multithreaded',)   # the basic engine on a cylindrical mesh against the default one
     paths = {engine: os.path.join(tempfile.gettempdir(), f'GPU_Engine_{name}_{engine}') for engine in engines}
@@ -650,22 +649,22 @@ for name, case, on_device in cases:
         for var in CASE_ENV.get(name, {}):
             del os.environ[var]
 
-    assert 'Create FDTD engine (GPU' not in logs[cpu], \
-        f'FAIL [{name}]: engine={cpu} created the GPU engine'
+    assert 'Create FDTD engine (GPU' not in logs['basic'], \
+        f'FAIL [{name}]: engine=basic created the GPU engine'
     assert 'Create FDTD engine (GPU, backend: reference' in logs['gpu-reference'], \
         f'FAIL [{name}]: engine=gpu-reference did not create the GPU engine with the reference backend'
 
-    diff, n_probes, n_dumps, _ = compare_outputs(paths[cpu], paths['gpu-reference'])
+    diff, n_probes, n_dumps, _ = compare_outputs(paths['basic'], paths['gpu-reference'])
     print(f'  reference backend: compared {n_probes} probe files and {n_dumps} field dumps')
-    assert not diff, f'FAIL [{name}]: reference backend differs from the {cpu} engine in: {", ".join(n for n, _ in diff)}'
+    assert not diff, f'FAIL [{name}]: reference backend differs from the basic engine in: {", ".join(n for n, _ in diff)}'
 
-    if 'multithreaded' in engines and cpu=='basic':
+    if 'multithreaded' in engines:
         diff, _, _, _ = compare_outputs(paths['basic'], paths['multithreaded'])
         assert not diff, f'FAIL [{name}]: the multithreaded engine differs from the basic engine in: {", ".join(n for n, _ in diff)}'
 
     if name=='cylinder_closed':
         # the H and the B field are interpolated alike, also on the alpha seam of the mesh
-        with h5py.File(os.path.join(paths[cpu], 'Ht_node.h5'), 'r') as H, h5py.File(os.path.join(paths[cpu], 'Bt_node.h5'), 'r') as B:
+        with h5py.File(os.path.join(paths['basic'], 'Ht_node.h5'), 'r') as H, h5py.File(os.path.join(paths['basic'], 'Bt_node.h5'), 'r') as B:
             ts = sorted(H['FieldData/TD'].keys())[-1]
             dev = deviation(H['FieldData/TD'][ts][()], B['FieldData/TD'][ts][()]/(4e-7*np.pi))
         assert dev<1e-6, f'FAIL [{name}]: the B field dump is not mue0 times the H field dump ({dev:.1e} of the peak)'
@@ -695,7 +694,7 @@ for name, case, on_device in cases:
             expected, unexpected = UPML_MODES[name]
             assert (expected is None or expected in logs['gpu']) and (unexpected is None or unexpected not in logs['gpu']), \
                 f'FAIL [{name}]: the HIP backend did not take the intended UPML update'
-        diff, _, _, worst = compare_outputs(paths[cpu], paths['gpu'], rtol=DEVICE_RTOL)
+        diff, _, _, worst = compare_outputs(paths['basic'], paths['gpu'], rtol=DEVICE_RTOL)
         print(f'  {backend} backend: max. deviation {worst:.1e} of the peak value')
         assert not diff, f'FAIL [{name}]: {backend} backend deviates from the basic engine: ' + \
             ', '.join(f'{n} ({d:.1e})' for n, d in diff)
