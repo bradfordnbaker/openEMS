@@ -58,7 +58,7 @@ public:
 	static Operator* New();
 	virtual ~Operator();
 
-	//! Choose the engine the operator creates (CreateEngine()), Engine::BASIC (default), SSE or GPU, and with it the layout of the coefficients (Coeffs_SSE_Compressed for the SSE engine, else Coeffs_Basic); before the operator is built
+	//! Choose the engine the operator creates (CreateEngine()), Engine::BASIC (default), SSE or GPU, and with it the layout of the coefficients (Coeffs_SSE_Compressed for the SSE engine, else Coeffs_Basic); before the operator is built, throws after
 	virtual void SetEngineType(Engine_Types::EngineType type);
 	Engine_Types::EngineType GetEngineType() const {return m_EngineType;}
 	//! The backend of a GPU engine (see GPU_Backend::New), which the operator takes over and hands on to its engine
@@ -323,9 +323,7 @@ protected:
 	Excitation* m_Exc; // excitation time signal class
 //	Operator_Ext_Excitation* m_Op_Ext_Exc; // excitation extension
 
-	Operator_Coeffs* m_Coeffs; //!< owned; Coeffs_Basic unless a derived class sets another one
-	//! Replace the coefficient storage (before the operator is built), taking over \a coeffs
-	void SetCoeffs(Operator_Coeffs* coeffs);
+	Operator_Coeffs* m_Coeffs; //!< owned, created by InitOperator() for m_EngineType; NULL before
 };
 
 inline Operator::DebugFlags operator|( Operator::DebugFlags a, Operator::DebugFlags b ) { return static_cast<Operator::DebugFlags>(static_cast<int>(a) | static_cast<int>(b)); }

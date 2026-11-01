@@ -56,7 +56,7 @@ Operator::Operator() : Operator_Base()
 	m_InvaildTimestep = false;
 	m_TimeStepVar = 3;
 	m_numThreads = 0;
-	m_Coeffs = new Coeffs_Basic();
+	m_Coeffs = NULL;
 	m_EngineType = Engine::BASIC;
 	m_GPU_Backend = NULL;
 	m_GPU_Parent = NULL;
@@ -77,15 +77,9 @@ void Operator::SetEngineType(Engine_Types::EngineType type)
 {
 	if ((type!=Engine::BASIC) && (type!=Engine::SSE) && (type!=Engine::GPU))
 		throw std::invalid_argument("Operator::SetEngineType: no such engine type");
-	if (type==m_EngineType)
-		return;
+	if (m_Coeffs)
+		throw std::logic_error("Operator::SetEngineType: the operator is built already, for another engine type");
 	m_EngineType = type;
-	// the GPU backends read the coefficients through GetVV() and friends, in any layout; the
-	// basic one is the fastest to build and read (the HIP backend makes its own sets anyway)
-	if (type!=Engine::SSE)
-		SetCoeffs(new Coeffs_Basic());
-	else
-		SetCoeffs(new Coeffs_SSE_Compressed());
 }
 
 void Operator::SetGPUBackend(GPU_Backend* backend, GPU_Backend* parent)
@@ -94,12 +88,6 @@ void Operator::SetGPUBackend(GPU_Backend* backend, GPU_Backend* parent)
 		delete m_GPU_Backend;
 	m_GPU_Backend = backend;
 	m_GPU_Parent = parent;
-}
-
-void Operator::SetCoeffs(Operator_Coeffs* coeffs)
-{
-	delete m_Coeffs;
-	m_Coeffs = coeffs;
 }
 
 Engine* Operator::CreateEngine()
@@ -128,7 +116,8 @@ void Operator::Init()
 
 	Operator_Base::Init();
 
-	m_Coeffs->Free();
+	delete m_Coeffs;
+	m_Coeffs = NULL;
 
 	m_epsR_ptr = NULL;
 	m_kappa_ptr = NULL;
@@ -154,7 +143,8 @@ void Operator::Delete()
 {
 	CSX = NULL;
 
-	m_Coeffs->Free();
+	delete m_Coeffs;
+	m_Coeffs = NULL;
 
 	delete MainOp; MainOp=0;
 	for (int n=0; n<3; ++n)
@@ -578,7 +568,8 @@ void Operator::ShowStat() const
 	cout << "Nyquist criteria (TS)\t: " << m_Exc->GetNyquistNum() << endl;
 	cout << "Nyquist criteria (s)\t: " << m_Exc->GetNyquistNum()*dT << endl;
 	cout << "-----------------------------------" << endl;
-	m_Coeffs->ShowStat(cout);
+	if (m_Coeffs)
+		m_Coeffs->ShowStat(cout);
 }
 
 void Operator::ShowExtStat() const
@@ -884,6 +875,13 @@ double Operator::GetMinMeshStep() const
 
 void Operator::InitOperator()
 {
+	// the layout the engine reads; the GPU backends read the coefficients through GetVV() and
+	// friends, in any layout, the basic one is the fastest to build and read
+	delete m_Coeffs;
+	if (m_EngineType==Engine::SSE)
+		m_Coeffs = new Coeffs_SSE_Compressed();
+	else
+		m_Coeffs = new Coeffs_Basic();
 	m_Coeffs->Init(numLines);
 }
 
