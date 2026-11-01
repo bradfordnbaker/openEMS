@@ -818,8 +818,24 @@ bool openEMS::SetupOperator()
 	// what defaults to AvailableThreads() (GPU operator build, field dumps, SAR, nf2ff) honours numThreads
 	SetThreadLimit(m_engine_numThreads);
 
+	// the command-line choice (openEMS::EngineType) as the engine type of the operator
+	Engine::EngineType type = Engine::UNKNOWN;
+	switch (m_engine)
+	{
+	case EngineType_Basic:
+		type = Engine::BASIC;
+		break;
+	case EngineType_SSE:
+		type = Engine::SSE;
+		break;
+	case EngineType_GPU:
+	case EngineType_GPU_Reference:   // the GPU engine, the reference backend chosen below
+		type = Engine::GPU;
+		break;
+	}
+
 	// the GPU backend first: without a usable device the operator is not worth building
-	const bool gpu = (m_engine == EngineType_GPU) || (m_engine == EngineType_GPU_Reference);
+	const bool gpu = (type==Engine::GPU);
 	GPU_Backend* gpu_backend = NULL;
 	if (gpu)
 	{
@@ -839,14 +855,8 @@ bool openEMS::SetupOperator()
 		}
 	}
 
-	Engine::EngineType type = Engine::SSE;
-	if (gpu)
-		type = Engine::GPU;
-	else if (m_engine == EngineType_Basic)
-		type = Engine::BASIC;
-
 	// one line for every mesh, ending in the engine type (bench.py looks for "(GPU)")
-	const char* names[] = {"basic + multi-threading", "compressed SSE + multi-threading", "GPU"};
+	const char* names[] = {"basic + multi-threading", "compressed SSE + multi-threading", "GPU", "unknown"};
 	if (CylinderCoords)
 	{
 		Operator_Cylinder* op_cyl = NULL;
