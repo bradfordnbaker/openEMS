@@ -15,6 +15,8 @@
 *	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <stdexcept>
+
 #include "engine.h"
 #include "extensions/engine_extension.h"
 #include "extensions/operator_extension.h"
@@ -60,6 +62,8 @@ Engine::~Engine()
 
 void Engine::SetSubGrid(Engine* sub, Engine_SubGridCoupling* coupling)
 {
+	if (m_ThreadPool)
+		throw std::logic_error("Engine::SetSubGrid: the engine is running already, its threads step the old grids");
 	delete m_SubGridCoupling;
 	delete m_SubGrid;
 	m_SubGrid = sub;

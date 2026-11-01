@@ -122,7 +122,7 @@ public:
 
 	EngineType GetType() const {return m_type;}
 
-	//! The sub-grid of a cylindrical multi-grid level: its engine (of the same type) and the coupling of the two, both taken over
+	//! The sub-grid of a cylindrical multi-grid level: its engine (of the same type) and the coupling of the two, both taken over; before the first IterateTS(), throws after
 	void SetSubGrid(Engine* sub, Engine_SubGridCoupling* coupling);
 	//! The engine of the sub-grid, NULL without one; the threads of this engine step it right after this engine in every half step (Engine_ThreadPool)
 	Engine* GetSubGridEngine() const {return m_SubGrid;}
