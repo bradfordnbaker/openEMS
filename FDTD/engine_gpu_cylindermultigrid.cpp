@@ -59,7 +59,7 @@ void Engine_GPU_CylinderMultiGrid::Init()
 	// this grid: backend, extensions, device or host fallback
 	Engine_GPU::Init();
 
-	Op_CMG->GetInterpolation(m_Interpol);
+	m_Interpol = Op_CMG->GetInterpolation();
 
 	// the sub-grid engine, created by its operator on a backend sharing our work stream
 	Operator_Cylinder* inner_op = Op_CMG->GetInnerOperator();

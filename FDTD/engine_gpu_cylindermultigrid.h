@@ -61,7 +61,7 @@ protected:
 
 	const Operator_CylinderMultiGrid* Op_CMG;
 	Engine_GPU* m_InnerEngine;
-	GPU_MultiGridInterpolation m_Interpol;
+	MultiGridInterpolation m_Interpol;
 	GPU_MultiGridLink* m_Link;
 };
 

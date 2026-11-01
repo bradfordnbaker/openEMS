@@ -20,7 +20,12 @@
 
 #include "tools/constants.h"
 #include "tools/arraylib/array_nijk.h"
-#include "gpu_backend.h"
+#include "tools/global.h"
+#include "tools/array_ops.h"
+#include "tools/aligned_allocator.h"
+#include "multigrid_interpolation.h"
+
+#include <vector>
 
 class Engine;
 class Engine_sse;
@@ -58,14 +63,14 @@ public:
 	virtual void Interpolate();
 
 	//! base voltages on r line split_pos-1 to the sub-grid
-	static void SyncVoltages(const ArrayLib::ArrayNIJK<FDTD_FLOAT>& base, ArrayLib::ArrayNIJK<FDTD_FLOAT>& sub, const GPU_MultiGridInterpolation& ip, const unsigned int numLines[3]);
+	static void SyncVoltages(const ArrayLib::ArrayNIJK<FDTD_FLOAT>& base, ArrayLib::ArrayNIJK<FDTD_FLOAT>& sub, const MultiGridInterpolation& ip, const unsigned int numLines[3]);
 	//! base grid fields on r line \a r from the sub-grid (\a currents: the current interpolation)
-	static void Interpolate(ArrayLib::ArrayNIJK<FDTD_FLOAT>& base, const ArrayLib::ArrayNIJK<FDTD_FLOAT>& sub, const GPU_MultiGridInterpolation& ip, bool currents, unsigned int r, const unsigned int numLines[3]);
+	static void Interpolate(ArrayLib::ArrayNIJK<FDTD_FLOAT>& base, const ArrayLib::ArrayNIJK<FDTD_FLOAT>& sub, const MultiGridInterpolation& ip, bool currents, unsigned int r, const unsigned int numLines[3]);
 
 protected:
 	Engine* m_Base;
 	Engine* m_Sub;
-	GPU_MultiGridInterpolation m_Interpol;
+	MultiGridInterpolation m_Interpol;
 	unsigned int m_numLines[3];
 };
 
@@ -85,7 +90,9 @@ protected:
 
 	Engine_sse* m_Base;
 	Engine_sse* m_Sub;
-	const Operator_CylinderMultiGrid* m_Op;
+	MultiGridInterpolation m_Interpol;   //!< the positions; the weights in all four lanes below
+	typedef std::vector<f4vector, aligned_allocator<f4vector> > f4weights;
+	f4weights m_w_v_2p[2], m_w_v_2pp[2], m_w_i_2p[2], m_w_i_2pp[2];
 	unsigned int m_numLines[3];
 	unsigned int m_numVectors;
 };

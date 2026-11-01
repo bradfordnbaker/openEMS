@@ -44,7 +44,7 @@ SubGrid_Coupling_Basic::SubGrid_Coupling_Basic(Engine* base, Engine* sub, const 
 {
 	m_Base = base;
 	m_Sub = sub;
-	op->GetInterpolation(m_Interpol);
+	m_Interpol = op->GetInterpolation();
 	for (int n=0; n<3; ++n)
 		m_numLines[n] = op->GetNumberOfLines(n, true);
 }
@@ -69,7 +69,7 @@ void SubGrid_Coupling_Basic::Interpolate()
 }
 
 // see SubGrid_Coupling_SSE::SyncVoltages()
-void SubGrid_Coupling_Basic::SyncVoltages(const ArrayLib::ArrayNIJK<FDTD_FLOAT>& base, ArrayLib::ArrayNIJK<FDTD_FLOAT>& sub, const GPU_MultiGridInterpolation& ip, const unsigned int numLines[3])
+void SubGrid_Coupling_Basic::SyncVoltages(const ArrayLib::ArrayNIJK<FDTD_FLOAT>& base, ArrayLib::ArrayNIJK<FDTD_FLOAT>& sub, const MultiGridInterpolation& ip, const unsigned int numLines[3])
 {
 	if (ip.split_pos<1)
 		return;
@@ -87,7 +87,7 @@ void SubGrid_Coupling_Basic::SyncVoltages(const ArrayLib::ArrayNIJK<FDTD_FLOAT>&
 }
 
 // see SubGrid_Coupling_SSE::InterpolVoltChild2Base() and InterpolCurrChild2Base()
-void SubGrid_Coupling_Basic::Interpolate(ArrayLib::ArrayNIJK<FDTD_FLOAT>& base, const ArrayLib::ArrayNIJK<FDTD_FLOAT>& sub, const GPU_MultiGridInterpolation& ip, bool currents, unsigned int r, const unsigned int numLines[3])
+void SubGrid_Coupling_Basic::Interpolate(ArrayLib::ArrayNIJK<FDTD_FLOAT>& base, const ArrayLib::ArrayNIJK<FDTD_FLOAT>& sub, const MultiGridInterpolation& ip, bool currents, unsigned int r, const unsigned int numLines[3])
 {
 	const std::vector<unsigned int>* pos_2p  = currents ? ip.pos_i_2p  : ip.pos_v_2p;
 	const std::vector<unsigned int>* pos_2pp = currents ? ip.pos_i_2pp : ip.pos_v_2pp;
@@ -112,10 +112,22 @@ SubGrid_Coupling_SSE::SubGrid_Coupling_SSE(Engine_sse* base, Engine_sse* sub, co
 {
 	m_Base = base;
 	m_Sub = sub;
-	m_Op = op;
+	m_Interpol = op->GetInterpolation();
 	for (int n=0; n<3; ++n)
 		m_numLines[n] = op->GetNumberOfLines(n, true);
 	m_numVectors = base->GetNumberOfVectors();
+
+	// the weights in all four lanes, for the f4vector fields
+	const std::vector<float>* w[4] = {m_Interpol.w_v_2p, m_Interpol.w_v_2pp, m_Interpol.w_i_2p, m_Interpol.w_i_2pp};
+	f4weights* f4w[4] = {m_w_v_2p, m_w_v_2pp, m_w_i_2p, m_w_i_2pp};
+	for (int k=0; k<4; ++k)
+		for (int n=0; n<2; ++n)
+		{
+			f4w[k][n].resize(w[k][n].size());
+			for (size_t a=0; a<w[k][n].size(); ++a)
+				for (int l=0; l<4; ++l)
+					f4w[k][n][a].f[l] = w[k][n][a];
+		}
 }
 
 void SubGrid_Coupling_SSE::SyncVoltages()
@@ -123,7 +135,7 @@ void SubGrid_Coupling_SSE::SyncVoltages()
 
 	//interpolate voltages from base engine to child engine...
 	unsigned int pos[3];
-	pos[0] = m_Op->GetSplitPos()-1;
+	pos[0] = m_Interpol.split_pos-1;
 	unsigned int pos1_half = 0;
 	f4vector v_null;
 	v_null.f[0] = 0;
@@ -153,15 +165,15 @@ void SubGrid_Coupling_SSE::SyncVoltages()
 
 void SubGrid_Coupling_SSE::SyncCurrents()
 {
-	InterpolCurrChild2Base(m_Op->GetSplitPos()-2);
+	InterpolCurrChild2Base(m_Interpol.split_pos-2);
 }
 
 void SubGrid_Coupling_SSE::Interpolate()
 {
 	//interpolate child data to base mesh...
-	for (unsigned int n=0; n<m_Op->m_Split_Pos-1; ++n)
+	for (unsigned int n=0; n<m_Interpol.split_pos-1; ++n)
 		InterpolVoltChild2Base(n);
-	for (unsigned int n=0; n<m_Op->m_Split_Pos-2; ++n)
+	for (unsigned int n=0; n<m_Interpol.split_pos-2; ++n)
 		InterpolCurrChild2Base(n);
 }
 
@@ -178,16 +190,16 @@ void SubGrid_Coupling_SSE::InterpolVoltChild2Base(unsigned int rPos)
 		for (pos[2]=0; pos[2]<m_numVectors; ++pos[2])
 		{
 			//r - direction
-			f4_volt(0, pos[0], pos[1], pos[2]).v  = m_Op->f4_interpol_v_2p[0][pos[1]].v * innerEngine_f4_volt(0, pos[0], m_Op->m_interpol_pos_v_2p[0][pos[1]], pos[2]).v
-													+ m_Op->f4_interpol_v_2pp[0][pos[1]].v * innerEngine_f4_volt(0, pos[0], m_Op->m_interpol_pos_v_2pp[0][pos[1]], pos[2]).v;
+			f4_volt(0, pos[0], pos[1], pos[2]).v  = m_w_v_2p[0][pos[1]].v * innerEngine_f4_volt(0, pos[0], m_Interpol.pos_v_2p[0][pos[1]], pos[2]).v
+													+ m_w_v_2pp[0][pos[1]].v * innerEngine_f4_volt(0, pos[0], m_Interpol.pos_v_2pp[0][pos[1]], pos[2]).v;
 
 			//z - direction
-			f4_volt(2, pos[0], pos[1], pos[2]).v  = m_Op->f4_interpol_v_2p[0][pos[1]].v * innerEngine_f4_volt(2, pos[0], m_Op->m_interpol_pos_v_2p[0][pos[1]], pos[2]).v
-													+ m_Op->f4_interpol_v_2pp[0][pos[1]].v * innerEngine_f4_volt(2, pos[0], m_Op->m_interpol_pos_v_2pp[0][pos[1]], pos[2]).v;
+			f4_volt(2, pos[0], pos[1], pos[2]).v  = m_w_v_2p[0][pos[1]].v * innerEngine_f4_volt(2, pos[0], m_Interpol.pos_v_2p[0][pos[1]], pos[2]).v
+													+ m_w_v_2pp[0][pos[1]].v * innerEngine_f4_volt(2, pos[0], m_Interpol.pos_v_2pp[0][pos[1]], pos[2]).v;
 
 			//alpha - direction
-			f4_volt(1, pos[0], pos[1], pos[2]).v  = m_Op->f4_interpol_v_2p[1][pos[1]].v * innerEngine_f4_volt(1, pos[0], m_Op->m_interpol_pos_v_2p[1][pos[1]], pos[2]).v
-													+ m_Op->f4_interpol_v_2pp[1][pos[1]].v * innerEngine_f4_volt(1, pos[0], m_Op->m_interpol_pos_v_2pp[1][pos[1]], pos[2]).v;
+			f4_volt(1, pos[0], pos[1], pos[2]).v  = m_w_v_2p[1][pos[1]].v * innerEngine_f4_volt(1, pos[0], m_Interpol.pos_v_2p[1][pos[1]], pos[2]).v
+													+ m_w_v_2pp[1][pos[1]].v * innerEngine_f4_volt(1, pos[0], m_Interpol.pos_v_2pp[1][pos[1]], pos[2]).v;
 		}
 	}
 }
@@ -205,16 +217,16 @@ void SubGrid_Coupling_SSE::InterpolCurrChild2Base(unsigned int rPos)
 		for (pos[2]=0; pos[2]<m_numVectors; ++pos[2])
 		{
 			//r - direction
-			f4_curr(0, pos[0], pos[1], pos[2]).v  = m_Op->f4_interpol_i_2p[0][pos[1]].v * innerEngine_f4_curr(0, pos[0], m_Op->m_interpol_pos_i_2p[0][pos[1]], pos[2]).v
-													+ m_Op->f4_interpol_i_2pp[0][pos[1]].v * innerEngine_f4_curr(0, pos[0], m_Op->m_interpol_pos_i_2pp[0][pos[1]], pos[2]).v;
+			f4_curr(0, pos[0], pos[1], pos[2]).v  = m_w_i_2p[0][pos[1]].v * innerEngine_f4_curr(0, pos[0], m_Interpol.pos_i_2p[0][pos[1]], pos[2]).v
+													+ m_w_i_2pp[0][pos[1]].v * innerEngine_f4_curr(0, pos[0], m_Interpol.pos_i_2pp[0][pos[1]], pos[2]).v;
 
 			//z - direction
-			f4_curr(2, pos[0], pos[1], pos[2]).v  = m_Op->f4_interpol_i_2p[0][pos[1]].v * innerEngine_f4_curr(2, pos[0], m_Op->m_interpol_pos_i_2p[0][pos[1]], pos[2]).v
-													+ m_Op->f4_interpol_i_2pp[0][pos[1]].v * innerEngine_f4_curr(2, pos[0], m_Op->m_interpol_pos_i_2pp[0][pos[1]], pos[2]).v;
+			f4_curr(2, pos[0], pos[1], pos[2]).v  = m_w_i_2p[0][pos[1]].v * innerEngine_f4_curr(2, pos[0], m_Interpol.pos_i_2p[0][pos[1]], pos[2]).v
+													+ m_w_i_2pp[0][pos[1]].v * innerEngine_f4_curr(2, pos[0], m_Interpol.pos_i_2pp[0][pos[1]], pos[2]).v;
 
 			//alpha - direction
-			f4_curr(1, pos[0], pos[1], pos[2]).v  = m_Op->f4_interpol_i_2p[1][pos[1]].v * innerEngine_f4_curr(1, pos[0], m_Op->m_interpol_pos_i_2p[1][pos[1]], pos[2]).v
-													+ m_Op->f4_interpol_i_2pp[1][pos[1]].v * innerEngine_f4_curr(1, pos[0], m_Op->m_interpol_pos_i_2pp[1][pos[1]], pos[2]).v;
+			f4_curr(1, pos[0], pos[1], pos[2]).v  = m_w_i_2p[1][pos[1]].v * innerEngine_f4_curr(1, pos[0], m_Interpol.pos_i_2p[1][pos[1]], pos[2]).v
+													+ m_w_i_2pp[1][pos[1]].v * innerEngine_f4_curr(1, pos[0], m_Interpol.pos_i_2pp[1][pos[1]], pos[2]).v;
 		}
 	}
 }

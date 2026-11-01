@@ -63,24 +63,6 @@ Operator_CylinderMultiGrid* Operator_CylinderMultiGrid::New(
 	return op;
 }
 
-void Operator_CylinderMultiGrid::GetInterpolation(GPU_MultiGridInterpolation& interpol) const
-{
-	interpol.split_pos = m_Split_Pos;
-	for (int n=0; n<2; ++n)
-		for (unsigned int a=0; a<numLines[1]; ++a)
-		{
-			interpol.pos_v_2p[n].push_back(m_interpol_pos_v_2p[n][a]);
-			interpol.pos_v_2pp[n].push_back(m_interpol_pos_v_2pp[n][a]);
-			interpol.pos_i_2p[n].push_back(m_interpol_pos_i_2p[n][a]);
-			interpol.pos_i_2pp[n].push_back(m_interpol_pos_i_2pp[n][a]);
-			// all four lanes of the SIMD coefficients are the same
-			interpol.w_v_2p[n].push_back(f4_interpol_v_2p[n][a].f[0]);
-			interpol.w_v_2pp[n].push_back(f4_interpol_v_2pp[n][a].f[0]);
-			interpol.w_i_2p[n].push_back(f4_interpol_i_2p[n][a].f[0]);
-			interpol.w_i_2pp[n].push_back(f4_interpol_i_2pp[n][a].f[0]);
-		}
-}
-
 void Operator_CylinderMultiGrid::SetEngineType(Engine_Types::EngineType type)
 {
 	Operator_Cylinder::SetEngineType(type);
@@ -186,18 +168,7 @@ void Operator_CylinderMultiGrid::Init()
 	if (m_EngineType!=Engine::UNKNOWN)   // on a new operator SetEngineType() hands it on
 		m_InnerOp->SetEngineType(m_EngineType);
 
-	for (int n=0;n<2;++n)
-	{
-		m_interpol_pos_v_2p[n] = NULL;
-		f4_interpol_v_2p[n]=NULL;
-		m_interpol_pos_v_2pp[n] = NULL;
-		f4_interpol_v_2pp[n]=NULL;
-
-		m_interpol_pos_i_2p[n] = NULL;
-		f4_interpol_i_2p[n]=NULL;
-		m_interpol_pos_i_2pp[n] = NULL;
-		f4_interpol_i_2pp[n]=NULL;
-	}
+	m_Interpol = MultiGridInterpolation();
 }
 
 bool Operator_CylinderMultiGrid::GetYeeCoords(int ny, unsigned int pos[3], double* coords, bool dualMesh) const
@@ -345,27 +316,18 @@ void Operator_CylinderMultiGrid::SetupInterpolation()
 {
 	// n==0 --> interpolation in r&z-direction
 	// n==1 --> interpolation in a-direction
+	m_Interpol = MultiGridInterpolation();
+	m_Interpol.split_pos = m_Split_Pos;
 	for (int n=0;n<2;++n)
 	{
-		delete[] m_interpol_pos_v_2p[n];
-		m_interpol_pos_v_2p[n] = new unsigned int[numLines[1]];
-		Delete1DArray_v4sf(f4_interpol_v_2p[n]);
-		f4_interpol_v_2p[n]=Create1DArray_v4sf(numLines[1]);
-
-		delete[] m_interpol_pos_v_2pp[n];
-		m_interpol_pos_v_2pp[n] = new unsigned int[numLines[1]];
-		Delete1DArray_v4sf(f4_interpol_v_2pp[n]);
-		f4_interpol_v_2pp[n]=Create1DArray_v4sf(numLines[1]);
-
-		delete[] m_interpol_pos_i_2p[n];
-		m_interpol_pos_i_2p[n] = new unsigned int[numLines[1]];
-		Delete1DArray_v4sf(f4_interpol_i_2p[n]);
-		f4_interpol_i_2p[n]=Create1DArray_v4sf(numLines[1]);
-
-		delete[] m_interpol_pos_i_2pp[n];
-		m_interpol_pos_i_2pp[n] = new unsigned int[numLines[1]];
-		Delete1DArray_v4sf(f4_interpol_i_2pp[n]);
-		f4_interpol_i_2pp[n]=Create1DArray_v4sf(numLines[1]);
+		m_Interpol.pos_v_2p[n].assign(numLines[1], 0);
+		m_Interpol.pos_v_2pp[n].assign(numLines[1], 0);
+		m_Interpol.pos_i_2p[n].assign(numLines[1], 0);
+		m_Interpol.pos_i_2pp[n].assign(numLines[1], 0);
+		m_Interpol.w_v_2p[n].assign(numLines[1], 0);
+		m_Interpol.w_v_2pp[n].assign(numLines[1], 0);
+		m_Interpol.w_i_2p[n].assign(numLines[1], 0);
+		m_Interpol.w_i_2pp[n].assign(numLines[1], 0);
 	}
 
 	bool isOdd, isEven;
@@ -384,33 +346,30 @@ void Operator_CylinderMultiGrid::SetupInterpolation()
 		  5		<--		2			3
 		  ...
 		  */
-		m_interpol_pos_i_2p[0][a_n] = a_n/2;
-		m_interpol_pos_i_2pp[0][a_n] = a_n/2 + isOdd - isEven;
+		m_Interpol.pos_i_2p[0][a_n] = a_n/2;
+		m_Interpol.pos_i_2pp[0][a_n] = a_n/2 + isOdd - isEven;
 		if ((a_n==0) && CC_closedAlpha)
-			m_interpol_pos_i_2pp[0][a_n] = m_InnerOp->numLines[1]-3;
+			m_Interpol.pos_i_2pp[0][a_n] = m_InnerOp->numLines[1]-3;
 		else if ((a_n==0) && !CC_closedAlpha)
-			m_interpol_pos_i_2pp[0][a_n] = 0;
+			m_Interpol.pos_i_2pp[0][a_n] = 0;
 
 		//setup some special treatments for not closed alpha mesh
 		if ((a_n==numLines[1]-2) && !CC_closedAlpha)
-			m_interpol_pos_i_2pp[0][a_n] = a_n/2 - 1;
+			m_Interpol.pos_i_2pp[0][a_n] = a_n/2 - 1;
 		if ((a_n==numLines[1]-1) && !CC_closedAlpha)
-			m_interpol_pos_i_2p[0][a_n] = m_interpol_pos_i_2pp[0][a_n] = a_n/2;
+			m_Interpol.pos_i_2p[0][a_n] = m_Interpol.pos_i_2pp[0][a_n] = a_n/2;
 
-		double dl_p=m_InnerOp->GetDiscLine(1,m_interpol_pos_i_2p[0][a_n],true);
-		double dl_pp=m_InnerOp->GetDiscLine(1,m_interpol_pos_i_2pp[0][a_n],true);
+		double dl_p=m_InnerOp->GetDiscLine(1,m_Interpol.pos_i_2p[0][a_n],true);
+		double dl_pp=m_InnerOp->GetDiscLine(1,m_Interpol.pos_i_2pp[0][a_n],true);
 		if ((a_n==0) && CC_closedAlpha)
 			dl_pp -= 2*PI;
 
-		for (int v=0;v<4;++v)
+		if (m_Interpol.pos_i_2p[0][a_n]==m_Interpol.pos_i_2pp[0][a_n])
+			m_Interpol.w_i_2p[0][a_n] = 1.0;
+		else
 		{
-			if (m_interpol_pos_i_2p[0][a_n]==m_interpol_pos_i_2pp[0][a_n])
-				f4_interpol_i_2p[0][a_n].f[v] = 1.0;
-			else
-			{
-				f4_interpol_i_2p[0][a_n].f[v] = (dl_pp-GetDiscLine(1,a_n,true)) / (dl_pp-dl_p);
-				f4_interpol_i_2pp[0][a_n].f[v] = (GetDiscLine(1,a_n,true)-dl_p) / (dl_pp-dl_p);
-			}
+			m_Interpol.w_i_2p[0][a_n] = (dl_pp-GetDiscLine(1,a_n,true)) / (dl_pp-dl_p);
+			m_Interpol.w_i_2pp[0][a_n] = (GetDiscLine(1,a_n,true)-dl_p) / (dl_pp-dl_p);
 		}
 
 		/* voltage interpolation position for r,z direction
@@ -423,21 +382,18 @@ void Operator_CylinderMultiGrid::SetupInterpolation()
 		  5		<--		2			3
 		  ...
 		  */
-		m_interpol_pos_v_2p[0][a_n] = a_n/2;
-		m_interpol_pos_v_2pp[0][a_n] = a_n/2 + isOdd;
+		m_Interpol.pos_v_2p[0][a_n] = a_n/2;
+		m_Interpol.pos_v_2pp[0][a_n] = a_n/2 + isOdd;
 
-		dl_p=m_InnerOp->GetDiscLine(1,m_interpol_pos_v_2p[0][a_n],false);
-		dl_pp=m_InnerOp->GetDiscLine(1,m_interpol_pos_v_2pp[0][a_n],false);
+		dl_p=m_InnerOp->GetDiscLine(1,m_Interpol.pos_v_2p[0][a_n],false);
+		dl_pp=m_InnerOp->GetDiscLine(1,m_Interpol.pos_v_2pp[0][a_n],false);
 
-		for (int v=0;v<4;++v)
+		if (m_Interpol.pos_v_2p[0][a_n]==m_Interpol.pos_v_2pp[0][a_n])
+			m_Interpol.w_v_2p[0][a_n] = 1.0;
+		else
 		{
-			if (m_interpol_pos_v_2p[0][a_n]==m_interpol_pos_v_2pp[0][a_n])
-				f4_interpol_v_2p[0][a_n].f[v] = 1.0;
-			else
-			{
-				f4_interpol_v_2p[0][a_n].f[v] = (dl_pp-GetDiscLine(1,a_n,false)) / (dl_pp-dl_p);
-				f4_interpol_v_2pp[0][a_n].f[v] = (GetDiscLine(1,a_n,false)-dl_p) / (dl_pp-dl_p);
-			}
+			m_Interpol.w_v_2p[0][a_n] = (dl_pp-GetDiscLine(1,a_n,false)) / (dl_pp-dl_p);
+			m_Interpol.w_v_2pp[0][a_n] = (GetDiscLine(1,a_n,false)-dl_p) / (dl_pp-dl_p);
 		}
 
 		/* current interpolation position for the alpha direction
@@ -450,29 +406,26 @@ void Operator_CylinderMultiGrid::SetupInterpolation()
 		  5		<--		2			3
 		  ...
 		  */
-		m_interpol_pos_i_2p[1][a_n] = a_n/2;
-		m_interpol_pos_i_2pp[1][a_n] = a_n/2 + isOdd;
+		m_Interpol.pos_i_2p[1][a_n] = a_n/2;
+		m_Interpol.pos_i_2pp[1][a_n] = a_n/2 + isOdd;
 
 		//setup some special treatments for not closed alpha mesh
 		if ((a_n==1) && !CC_closedAlpha)
-			m_interpol_pos_i_2p[1][a_n] = 2;
+			m_Interpol.pos_i_2p[1][a_n] = 2;
 		if ((a_n==numLines[1]-2) && !CC_closedAlpha)
-			m_interpol_pos_i_2pp[1][a_n] = a_n/2 - 1;
+			m_Interpol.pos_i_2pp[1][a_n] = a_n/2 - 1;
 
-		for (int v=0;v<4;++v)
+		if (m_Interpol.pos_i_2p[1][a_n]==m_Interpol.pos_i_2pp[1][a_n])
+			m_Interpol.w_i_2p[1][a_n] = GetDiscDelta(1,a_n,true)/m_InnerOp->GetDiscDelta(1,m_Interpol.pos_i_2p[1][a_n],true);
+		else
 		{
-			if (m_interpol_pos_i_2p[1][a_n]==m_interpol_pos_i_2pp[1][a_n])
-				f4_interpol_i_2p[1][a_n].f[v] = GetDiscDelta(1,a_n,true)/m_InnerOp->GetDiscDelta(1,m_interpol_pos_i_2p[1][a_n],true);
-			else
-			{
-				f4_interpol_i_2p[1][a_n].f[v] = (m_InnerOp->GetDiscLine(1,m_interpol_pos_i_2pp[1][a_n],false)-GetDiscLine(1,a_n,false)) /
-						(m_InnerOp->GetDiscLine(1,m_interpol_pos_i_2pp[1][a_n],false)-m_InnerOp->GetDiscLine(1,m_interpol_pos_i_2p[1][a_n],false));
-				f4_interpol_i_2p[1][a_n].f[v] *= GetDiscDelta(1,a_n,true)/m_InnerOp->GetDiscDelta(1,m_interpol_pos_i_2p[1][a_n],true);
+			m_Interpol.w_i_2p[1][a_n] = (m_InnerOp->GetDiscLine(1,m_Interpol.pos_i_2pp[1][a_n],false)-GetDiscLine(1,a_n,false)) /
+					(m_InnerOp->GetDiscLine(1,m_Interpol.pos_i_2pp[1][a_n],false)-m_InnerOp->GetDiscLine(1,m_Interpol.pos_i_2p[1][a_n],false));
+			m_Interpol.w_i_2p[1][a_n] *= GetDiscDelta(1,a_n,true)/m_InnerOp->GetDiscDelta(1,m_Interpol.pos_i_2p[1][a_n],true);
 
-				f4_interpol_i_2pp[1][a_n].f[v] = (GetDiscLine(1,a_n,false)-m_InnerOp->GetDiscLine(1,m_interpol_pos_i_2p[1][a_n],false)) /
-						(m_InnerOp->GetDiscLine(1,m_interpol_pos_i_2pp[1][a_n],false)-m_InnerOp->GetDiscLine(1,m_interpol_pos_i_2p[1][a_n],false));
-				f4_interpol_i_2pp[1][a_n].f[v] *= GetDiscDelta(1,a_n,true)/m_InnerOp->GetDiscDelta(1,m_interpol_pos_i_2pp[1][a_n],true);
-			}
+			m_Interpol.w_i_2pp[1][a_n] = (GetDiscLine(1,a_n,false)-m_InnerOp->GetDiscLine(1,m_Interpol.pos_i_2p[1][a_n],false)) /
+					(m_InnerOp->GetDiscLine(1,m_Interpol.pos_i_2pp[1][a_n],false)-m_InnerOp->GetDiscLine(1,m_Interpol.pos_i_2p[1][a_n],false));
+			m_Interpol.w_i_2pp[1][a_n] *= GetDiscDelta(1,a_n,true)/m_InnerOp->GetDiscDelta(1,m_Interpol.pos_i_2pp[1][a_n],true);
 		}
 
 		/* voltage interpolation position for the alpha direction
@@ -485,38 +438,35 @@ void Operator_CylinderMultiGrid::SetupInterpolation()
 		  5		<--		2			3
 		  ...
 		  */
-		m_interpol_pos_v_2p[1][a_n] = a_n/2;
-		m_interpol_pos_v_2pp[1][a_n] = a_n/2 + isOdd - isEven;
+		m_Interpol.pos_v_2p[1][a_n] = a_n/2;
+		m_Interpol.pos_v_2pp[1][a_n] = a_n/2 + isOdd - isEven;
 
 		if ((a_n==0) && CC_closedAlpha)
-			m_interpol_pos_v_2pp[1][a_n] = m_InnerOp->numLines[1]-3;
+			m_Interpol.pos_v_2pp[1][a_n] = m_InnerOp->numLines[1]-3;
 		else if ((a_n==0) && !CC_closedAlpha)
-			m_interpol_pos_v_2pp[1][a_n] = 1;
+			m_Interpol.pos_v_2pp[1][a_n] = 1;
 
 		//setup some special treatments for not closed alpha mesh
 		if ((a_n==numLines[1]-2) && !CC_closedAlpha)
-			m_interpol_pos_v_2pp[1][a_n] = a_n/2 - 1;
+			m_Interpol.pos_v_2pp[1][a_n] = a_n/2 - 1;
 		if ((a_n==numLines[1]-1) && !CC_closedAlpha)
 		{
-			m_interpol_pos_v_2p[1][a_n] = 0;
-			m_interpol_pos_v_2pp[1][a_n] = 0;
+			m_Interpol.pos_v_2p[1][a_n] = 0;
+			m_Interpol.pos_v_2pp[1][a_n] = 0;
 		}
 
-		dl_p=m_InnerOp->GetDiscLine(1,m_interpol_pos_v_2p[1][a_n],true);
-		dl_pp=m_InnerOp->GetDiscLine(1,m_interpol_pos_v_2pp[1][a_n],true);
+		dl_p=m_InnerOp->GetDiscLine(1,m_Interpol.pos_v_2p[1][a_n],true);
+		dl_pp=m_InnerOp->GetDiscLine(1,m_Interpol.pos_v_2pp[1][a_n],true);
 
-		for (int v=0;v<4;++v)
+		if (m_Interpol.pos_v_2p[1][a_n]==m_Interpol.pos_v_2pp[1][a_n])
+			m_Interpol.w_v_2p[1][a_n] = m_Interpol.w_v_2pp[1][a_n] = 0;
+		else
 		{
-			if (m_interpol_pos_v_2p[1][a_n]==m_interpol_pos_v_2pp[1][a_n])
-				f4_interpol_v_2p[1][a_n].f[v] = f4_interpol_v_2pp[1][a_n].f[v] = 0;
-			else
-			{
-				f4_interpol_v_2p[1][a_n].f[v] = (dl_pp-GetDiscLine(1,a_n,true)) / (dl_pp-dl_p);
-				f4_interpol_v_2p[1][a_n].f[v] *= GetDiscDelta(1,a_n,false)/m_InnerOp->GetDiscDelta(1,m_interpol_pos_v_2p[1][a_n],false);
+			m_Interpol.w_v_2p[1][a_n] = (dl_pp-GetDiscLine(1,a_n,true)) / (dl_pp-dl_p);
+			m_Interpol.w_v_2p[1][a_n] *= GetDiscDelta(1,a_n,false)/m_InnerOp->GetDiscDelta(1,m_Interpol.pos_v_2p[1][a_n],false);
 
-				f4_interpol_v_2pp[1][a_n].f[v] = (GetDiscLine(1,a_n,true)-dl_p) / (dl_pp-dl_p);
-				f4_interpol_v_2pp[1][a_n].f[v] *= GetDiscDelta(1,a_n,false)/m_InnerOp->GetDiscDelta(1,m_interpol_pos_v_2pp[1][a_n],false);
-			}
+			m_Interpol.w_v_2pp[1][a_n] = (GetDiscLine(1,a_n,true)-dl_p) / (dl_pp-dl_p);
+			m_Interpol.w_v_2pp[1][a_n] *= GetDiscDelta(1,a_n,false)/m_InnerOp->GetDiscDelta(1,m_Interpol.pos_v_2pp[1][a_n],false);
 		}
 	}
 }
@@ -532,26 +482,7 @@ void Operator_CylinderMultiGrid::Delete()
 	delete m_InnerOp;
 	m_InnerOp=0;
 
-	for (int n=0;n<2;++n)
-	{
-		delete[] m_interpol_pos_v_2p[n];
-		m_interpol_pos_v_2p[n]=NULL;
-		Delete1DArray_v4sf(f4_interpol_v_2p[n]);
-		f4_interpol_v_2p[n]=NULL;
-		delete[] m_interpol_pos_v_2pp[n];
-		m_interpol_pos_v_2pp[n]=NULL;
-		Delete1DArray_v4sf(f4_interpol_v_2pp[n]);
-		f4_interpol_v_2pp[n]=NULL;
-
-		delete[] m_interpol_pos_i_2p[n];
-		m_interpol_pos_i_2p[n]=NULL;
-		Delete1DArray_v4sf(f4_interpol_i_2p[n]);
-		f4_interpol_i_2p[n]=NULL;
-		delete[] m_interpol_pos_i_2pp[n];
-		m_interpol_pos_i_2pp[n]=NULL;
-		Delete1DArray_v4sf(f4_interpol_i_2pp[n]);
-		f4_interpol_i_2pp[n]=NULL;
-	}
+	m_Interpol = MultiGridInterpolation();
 }
 
 void Operator_CylinderMultiGrid::Reset()

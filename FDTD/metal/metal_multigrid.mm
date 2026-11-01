@@ -61,7 +61,7 @@ kernel void mg_interpolate(device float* base          [[buffer(0)]],
 class Metal_MultiGridLink : public GPU_MultiGridLink
 {
 public:
-	Metal_MultiGridLink(GPU_Backend_Metal::Impl* base, GPU_Backend_Metal::Impl* sub, const GPU_MultiGridInterpolation& interpol);
+	Metal_MultiGridLink(GPU_Backend_Metal::Impl* base, GPU_Backend_Metal::Impl* sub, const MultiGridInterpolation& interpol);
 
 	virtual void SyncVoltages();
 	virtual void SyncCurrents();
@@ -79,7 +79,7 @@ protected:
 	Weights m_Volt, m_Curr;
 };
 
-Metal_MultiGridLink::Metal_MultiGridLink(GPU_Backend_Metal::Impl* base, GPU_Backend_Metal::Impl* sub, const GPU_MultiGridInterpolation& interpol)
+Metal_MultiGridLink::Metal_MultiGridLink(GPU_Backend_Metal::Impl* base, GPU_Backend_Metal::Impl* sub, const MultiGridInterpolation& interpol)
 {
 	b = base;
 	s = sub;
@@ -161,7 +161,7 @@ void Metal_MultiGridLink::InterpolateToBase()
 		Interpolate(b->curr, s->curr, m_Curr, 0, m_SplitPos-2);
 }
 
-GPU_MultiGridLink* GPU_Backend_Metal::CreateMultiGridLink(GPU_Backend* sub_grid, const GPU_MultiGridInterpolation& interpol)
+GPU_MultiGridLink* GPU_Backend_Metal::CreateMultiGridLink(GPU_Backend* sub_grid, const MultiGridInterpolation& interpol)
 {
 	GPU_Backend_Metal* sub = dynamic_cast<GPU_Backend_Metal*>(sub_grid);
 	if (!sub || sub->d->ctx!=d->ctx)

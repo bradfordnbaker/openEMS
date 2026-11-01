@@ -60,7 +60,7 @@ __global__ void mg_interpolate(float* base, const float* sub, MGWeights W, HIP_G
 class HIP_MultiGridLink : public GPU_MultiGridLink
 {
 public:
-	HIP_MultiGridLink(GPU_Backend_HIP::Impl* base, GPU_Backend_HIP::Impl* sub, const GPU_MultiGridInterpolation& interpol);
+	HIP_MultiGridLink(GPU_Backend_HIP::Impl* base, GPU_Backend_HIP::Impl* sub, const MultiGridInterpolation& interpol);
 
 	virtual void SyncVoltages();
 	virtual void SyncCurrents();
@@ -77,7 +77,7 @@ protected:
 	MGWeights m_Volt, m_Curr;
 };
 
-HIP_MultiGridLink::HIP_MultiGridLink(GPU_Backend_HIP::Impl* base, GPU_Backend_HIP::Impl* sub, const GPU_MultiGridInterpolation& interpol)
+HIP_MultiGridLink::HIP_MultiGridLink(GPU_Backend_HIP::Impl* base, GPU_Backend_HIP::Impl* sub, const MultiGridInterpolation& interpol)
 {
 	b = base;
 	s = sub;
@@ -134,7 +134,7 @@ void HIP_MultiGridLink::InterpolateToBase()
 		Interpolate(b->curr, s->curr, m_Curr, 0, m_SplitPos-2);
 }
 
-GPU_MultiGridLink* GPU_Backend_HIP::CreateMultiGridLink(GPU_Backend* sub_grid, const GPU_MultiGridInterpolation& interpol)
+GPU_MultiGridLink* GPU_Backend_HIP::CreateMultiGridLink(GPU_Backend* sub_grid, const MultiGridInterpolation& interpol)
 {
 	GPU_Backend_HIP* sub = dynamic_cast<GPU_Backend_HIP*>(sub_grid);
 	// only for a sub-grid on the same context: the coupling kernels are ordered by the shared stream
