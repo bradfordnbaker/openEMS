@@ -1228,12 +1228,7 @@ void Operator::ApplyMagneticBC(bool* dirs)
 	}
 }
 
-bool Operator::Calc_ECPos(
-	int ny,
-	const unsigned int* pos,
-	double* EC,
-	std::vector<CSPrimitives*> vPrims
-) const
+bool Operator::Calc_ECPos(int ny, const unsigned int* pos, double* EC, std::vector<CSPrimitives*> vPrims) const
 {
 	double EffMat[4];
 	Calc_EffMatPos(ny,pos,EffMat, vPrims);
@@ -1315,13 +1310,7 @@ bool Operator::GetCellCenterMaterialAvgCoord(const int pos[], double coord[3]) c
 	return true;
 }
 
-double Operator::GetMaterial(
-	int ny,
-	const double* coords,
-	int MatType,
-	std::vector<CSPrimitives*> vPrims,
-	bool markAsUsed
-) const
+double Operator::GetMaterial(int ny, const double* coords, int MatType, std::vector<CSPrimitives*> vPrims, bool markAsUsed) const
 {
 	CSProperties* prop = CSX->GetPropertyByCoordPriority(coords,vPrims,markAsUsed);
 
@@ -1364,12 +1353,7 @@ double Operator::GetMaterial(
 	}
 }
 
-bool Operator::AverageMatCellCenter(
-	int ny,
-	const unsigned int* pos,
-	double* EffMat,
-	std::vector<CSPrimitives *> vPrims
-) const
+bool Operator::AverageMatCellCenter(int ny, const unsigned int* pos, double* EffMat, std::vector<CSPrimitives *> vPrims) const
 {
 	int n=ny;
 	double coord[3];
@@ -1475,12 +1459,7 @@ bool Operator::AverageMatCellCenter(
 	return true;
 }
 
-bool Operator::AverageMatQuarterCell(
-	int ny,
-	const unsigned int* pos,
-	double* EffMat,
-	std::vector<CSPrimitives*> vPrims
-) const
+bool Operator::AverageMatQuarterCell(int ny, const unsigned int* pos, double* EffMat, std::vector<CSPrimitives*> vPrims) const
 {
 	int n=ny;
 	double coord[3];
@@ -1594,12 +1573,7 @@ bool Operator::AverageMatQuarterCell(
 	return true;
 }
 
-bool Operator::Calc_EffMatPos(
-	int ny,
-	const unsigned int* pos,
-	double* EffMat,
-	std::vector<CSPrimitives *> vPrims
-) const
+bool Operator::Calc_EffMatPos(int ny, const unsigned int* pos, double* EffMat, std::vector<CSPrimitives *> vPrims) const
 {
 	switch (m_MatAverageMethod)
 	{
@@ -1876,11 +1850,7 @@ void Operator::CalcStartStopLines(unsigned int &numThreads, std::vector<unsigned
 	}
 }
 
-std::vector<CSPrimitives*>
-Operator::GetPrimitivesBoundBox(
-	int posX, int posY, int posZ,
-	CSProperties::PropertyType type
-) const
+std::vector<CSPrimitives*> Operator::GetPrimitivesBoundBox(int posX, int posY, int posZ, CSProperties::PropertyType type) const
 {
 	double boundBox[6];
 	int BBpos[3] = {posX, posY, posZ};

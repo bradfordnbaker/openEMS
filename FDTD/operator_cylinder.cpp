@@ -62,13 +62,7 @@ double Operator_Cylinder::GetRawDiscDelta(int ny, const int pos) const
 	return Operator::GetRawDiscDelta(ny,pos);
 }
 
-double Operator_Cylinder::GetMaterial(
-	int ny,
-	const double* coords,
-	int MatType,
-	std::vector<CSPrimitives*> vPrims,
-	bool markAsUsed
-) const
+double Operator_Cylinder::GetMaterial(int ny, const double* coords, int MatType, std::vector<CSPrimitives*> vPrims, bool markAsUsed) const
 {
 	double l_coords[] = {coords[0],coords[1],coords[2]};
 	if (CC_closedAlpha && (coords[1]>GetDiscLine(1,0,false)+2*PI))
