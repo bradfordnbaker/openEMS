@@ -51,6 +51,13 @@ cdef extern from "openEMS/openems.h":
         int Get_PML_Size(int idx)
         void Set_Mur_PhaseVel(int idx, double val)
 
+        void SetCPML(bool enable)
+        void SetCPMLKappaMax(double val)
+        void SetCPMLAlphaMax(double val)
+        void SetCPMLSigmaMax(double val)
+        void SetCPMLGradingOrder(double val)
+        void SetCPMLReflectionCoeff(double val)
+
         void SetGaussExcite(double f0, double fc, bool dcFree)
         void SetSinusExcite(double f0)
         void SetDiracExcite(double f_max)

@@ -336,6 +336,72 @@ cdef class openEMS:
                 continue
             raise Exception('Unknown boundary condition')
 
+    def SetCPML(self, enable=True):
+        """ SetCPML(enable=True)
+
+        Enable or disable CPML (Convolutional Perfectly Matched Layer) absorbing boundary conditions.
+
+        When enabled, CPML will be used instead of the default UPML for PML boundaries.
+
+        :param enable: bool -- Enable (True, default) or Disable (False) CPML
+
+        See Also
+        --------
+        SetCPMLKappaMax, SetCPMLAlphaMax, SetCPMLSigmaMax, SetCPMLGradingOrder, SetCPMLReflectionCoeff
+        """
+        self.thisptr.SetCPML(enable)
+
+    def SetCPMLKappaMax(self, val):
+        """ SetCPMLKappaMax(val)
+
+        Set the maximum kappa stretching parameter for CPML.
+
+        :param val: float -- Maximum kappa value (default=1.0)
+        """
+        self.thisptr.SetCPMLKappaMax(val)
+
+    def SetCPMLAlphaMax(self, val):
+        """ SetCPMLAlphaMax(val)
+
+        Set the maximum CFS alpha parameter for CPML.
+
+        :param val: float -- Maximum alpha value (default=0.05, typical range: 0.0-0.1)
+        """
+        self.thisptr.SetCPMLAlphaMax(val)
+
+    def SetCPMLSigmaMax(self, val):
+        """ SetCPMLSigmaMax(val)
+
+        Set the maximum conductivity (sigma) for CPML.
+
+        :param val: float -- Maximum sigma value (default=-1.0 for auto-calculation)
+                            Auto is 0.8*(m+1)/(Z0*delta) with delta the mean PML cell
+                            size (same as R = exp(-1.6*cells)), or from the
+                            reflection coefficient if one is set
+        """
+        self.thisptr.SetCPMLSigmaMax(val)
+
+    def SetCPMLGradingOrder(self, val):
+        """ SetCPMLGradingOrder(val)
+
+        Set the polynomial grading order for CPML parameters.
+
+        :param val: float -- Grading order (default=4.0)
+        """
+        self.thisptr.SetCPMLGradingOrder(val)
+
+    def SetCPMLReflectionCoeff(self, val):
+        """ SetCPMLReflectionCoeff(val)
+
+        Set the target reflection coefficient for CPML.
+
+        If set (0 < val < 1), sigma_max is auto-calculated from it as
+        -(m+1)*ln(val)/(2*Z0*d), d the PML thickness, unless sigma_max is set.
+
+        :param val: float -- Reflection coefficient (default unset)
+        """
+        self.thisptr.SetCPMLReflectionCoeff(val)
+
     def AddLumpedPort(self, port_nr, R, start, stop, p_dir, excite=0, **kw):
         """ AddLumpedPort(port_nr, R, start, stop, p_dir, excite=0, **kw)
 

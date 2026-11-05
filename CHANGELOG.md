@@ -34,6 +34,13 @@ there are unreleased changes. It becomes the next release entry.
   structure closed by PEC. Away from DC the spectrum is the same; below about
   f0-fc it falls to zero at DC. With `f0=0` the pulse is the derivative of the
   Gaussian, with its peak at about 0.47*fc and its -20dB edge at 1.3*fc.
+- **A convolutional PML (CPML)** as an alternative to the UPML for `PML_n`
+  boundaries, enabled from Python with `SetCPML()`. `SetCPMLKappaMax()`,
+  `SetCPMLAlphaMax()`, `SetCPMLSigmaMax()`, `SetCPMLGradingOrder()` and
+  `SetCPMLReflectionCoeff()` set its grading; sigma is chosen automatically
+  by default. Python only so far: the setting is not written to the XML, so
+  Octave and the openEMS binary still use the UPML. The GPU engine runs it on
+  the host.
 
 ### Fixed
 
