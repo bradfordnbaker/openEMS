@@ -97,6 +97,14 @@ public:
 	int Get_PML_Size(int idx);
 	void Set_Mur_PhaseVel(int idx, double val);
 
+	// CPML configuration methods
+	void SetCPML(bool enable = true) { m_use_CPML = enable; }
+	void SetCPMLKappaMax(double val) { m_CPML_kappa_max = val; }
+	void SetCPMLAlphaMax(double val) { m_CPML_alpha_max = val; }
+	void SetCPMLSigmaMax(double val) { m_CPML_sigma_max = val; }
+	void SetCPMLGradingOrder(double val) { m_CPML_grading_order = val; }
+	void SetCPMLReflectionCoeff(double val) { m_CPML_reflection_coeff = val; }
+
 	//! Get information about external libs used by openEMS
 	static std::string GetExtLibsInfo(std::string prefix="\t");
 
@@ -178,6 +186,14 @@ protected:
 	int m_BC_type[6];
 	unsigned int m_PML_size[6];
 	double m_Mur_v_ph[6];
+
+	// CPML configuration
+	bool m_use_CPML;
+	double m_CPML_kappa_max;
+	double m_CPML_alpha_max;
+	double m_CPML_sigma_max;
+	double m_CPML_grading_order;
+	double m_CPML_reflection_coeff;
 
 	//! Setup local absorbing boundary conditions
 	void SetupAbsorbingSheets();

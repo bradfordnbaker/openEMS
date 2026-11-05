@@ -45,6 +45,7 @@ class Operator : public Operator_Base
 	friend class Operator_Ext_PML_SF_Plane;
 	friend class Operator_Ext_Excitation;
 	friend class Operator_Ext_UPML;
+	friend class Operator_Ext_CPML;
 	friend class Operator_Ext_Cylinder;
 	friend class Operator_Ext_LumpedRLC;
 	friend class Operator_Ext_Absorbing_BC;

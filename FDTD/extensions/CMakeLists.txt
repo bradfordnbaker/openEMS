@@ -14,6 +14,8 @@ set(SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/engine_ext_debyematerial.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/operator_ext_upml.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/engine_ext_upml.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/operator_ext_cpml.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/engine_ext_cpml.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/operator_extension.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/engine_ext_mur_abc.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/operator_ext_mur_abc.cpp
